@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2000 1000" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="50%" stop-color="#f1f5f9" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cbd5e1" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#94a3b8" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#64748b" stop-opacity="0.65" />
+    </linearGradient>
+    <linearGradient id="pastelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.4" />
+      <stop offset="50%" stop-color="#a7f3d0" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0.3" />
+    </linearGradient>
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Fondo base suave -->
+  <rect width="2000" height="1000" fill="url(#bgGrad)" />
+
+  <!-- Graticule: Paralelos y Meridianos sutiles -->
+  <g stroke="#94a3b8" stroke-width="0.75" stroke-dasharray="4 6" opacity="0.35" fill="none">
+    <!-- Paralelos -->
+    <line x1="100" y1="100" x2="1900" y2="100" />
+    <line x1="100" y1="233" x2="1900" y2="233" />
+    <line x1="100" y1="366" x2="1900" y2="366" />
+    <line x1="100" y1="500" x2="1900" y2="500" stroke-width="1.2" stroke-dasharray="8 6" stroke="#64748b" /> <!-- Ecuador -->
+    <line x1="100" y1="633" x2="1900" y2="633" />
+    <line x1="100" y1="766" x2="1900" y2="766" />
+    <line x1="100" y1="900" x2="1900" y2="900" />
+
+    <!-- Meridianos curvos elípticos -->
+    <ellipse cx="1000" cy="500" rx="900" ry="420" />
+    <ellipse cx="1000" cy="500" rx="720" ry="420" />
+    <ellipse cx="1000" cy="500" rx="540" ry="420" />
+    <ellipse cx="1000" cy="500" rx="360" ry="420" />
+    <ellipse cx="1000" cy="500" rx="180" ry="420" />
+    <line x1="1000" y1="80" x2="1000" y2="920" stroke-width="1" />
+  </g>
+
+  <!-- Rutas de vuelo y navegación trazadas en arcos suaves -->
+  <g stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="5 7" opacity="0.25" fill="none">
+    <path d="M 950 310 Q 1200 200 1550 360" />
+    <path d="M 520 340 Q 750 180 960 300" />
+    <path d="M 970 320 Q 990 480 1060 720" />
+    <path d="M 520 360 Q 600 550 680 750" />
+    <path d="M 980 320 Q 1300 480 1620 720" />
+  </g>
+
+  <!-- Continentes del mundo en vectores estilizados con tonos pastel suaves -->
+  <g fill="url(#landGrad)" stroke="#64748b" stroke-width="1" stroke-opacity="0.4" stroke-linejoin="round">
+
+    <!-- EUROPA -->
+    <path d="M 930 240 
+             C 950 230, 980 220, 1010 230 
+             C 1030 220, 1070 230, 1090 260 
+             C 1110 280, 1080 320, 1050 330 
+             C 1030 350, 1010 370, 990 380 
+             C 970 385, 960 400, 940 400 
+             C 920 390, 910 370, 915 350 
+             C 890 340, 880 320, 895 300 
+             C 900 280, 920 260, 930 240 Z" fill="#93c5fd" fill-opacity="0.55" />
+    <!-- Península Ibérica -->
+    <path d="M 915 345 C 935 345, 945 365, 935 385 C 915 395, 895 380, 900 360 Z" fill="#6ee7b7" fill-opacity="0.6" stroke="#059669" stroke-width="0.8" />
+    <!-- Islas Británicas -->
+    <path d="M 890 260 C 905 250, 915 270, 905 290 C 890 295, 880 275, 890 260 Z" fill="#93c5fd" fill-opacity="0.5" />
+    <path d="M 875 270 C 885 265, 890 280, 880 290 C 870 285, 870 275, 875 270 Z" fill="#93c5fd" fill-opacity="0.4" />
+    <!-- Escandinavia -->
+    <path d="M 970 160 C 990 150, 1010 180, 1000 230 C 980 240, 960 210, 970 160 Z" fill="#a5b4fc" fill-opacity="0.5" />
+
+    <!-- ÁFRICA -->
+    <path d="M 920 410 
+             C 960 400, 1020 410, 1070 450 
+             C 1120 490, 1140 560, 1110 630 
+             C 1090 690, 1060 760, 1020 810 
+             C 990 830, 980 790, 970 740 
+             C 950 670, 920 620, 900 560 
+             C 870 500, 880 430, 920 410 Z" fill="#fde68a" fill-opacity="0.45" />
+    <!-- Madagascar -->
+    <path d="M 1125 670 C 1140 660, 1150 710, 1135 750 C 1120 740, 1115 690, 1125 670 Z" fill="#fde68a" fill-opacity="0.4" />
+
+    <!-- ASIA -->
+    <path d="M 1090 240 
+             C 1180 200, 1310 180, 1450 200 
+             C 1560 220, 1680 250, 1720 320 
+             C 1740 370, 1680 430, 1620 440 
+             C 1580 460, 1540 520, 1480 540 
+             C 1420 560, 1360 520, 1320 460 
+             C 1280 480, 1220 540, 1180 520 
+             C 1150 480, 1140 440, 1110 410 
+             C 1080 370, 1060 280, 1090 240 Z" fill="#fed7aa" fill-opacity="0.45" />
+    <!-- Subcontinente Indio -->
+    <path d="M 1250 450 C 1290 470, 1330 520, 1290 590 C 1260 580, 1240 510, 1250 450 Z" fill="#fed7aa" fill-opacity="0.5" />
+    <!-- Sudeste Asiático e Indonesia -->
+    <path d="M 1430 510 C 1470 530, 1490 580, 1460 620 C 1430 600, 1420 550, 1430 510 Z" fill="#fed7aa" fill-opacity="0.4" />
+    <path d="M 1460 630 C 1510 630, 1560 650, 1520 670 C 1470 660, 1450 640, 1460 630 Z" fill="#fed7aa" fill-opacity="0.4" />
+    <path d="M 1540 600 C 1580 600, 1600 640, 1570 650 C 1540 640, 1530 610, 1540 600 Z" fill="#fed7aa" fill-opacity="0.4" />
+    <!-- Japón -->
+    <path d="M 1670 330 C 1690 320, 1710 360, 1690 410 C 1675 390, 1665 350, 1670 330 Z" fill="#fed7aa" fill-opacity="0.5" />
+
+    <!-- AMÉRICA DEL NORTE -->
+    <path d="M 320 180 
+             C 420 140, 560 150, 680 190 
+             C 740 220, 780 280, 760 350 
+             C 730 400, 680 440, 650 490 
+             C 610 540, 560 560, 530 540 
+             C 500 500, 470 480, 440 450 
+             C 380 420, 310 390, 260 320 
+             C 240 260, 270 210, 320 180 Z" fill="#bfdbfe" fill-opacity="0.5" />
+    <!-- Groenlandia -->
+    <path d="M 720 100 C 790 90, 840 120, 810 180 C 760 210, 700 170, 720 100 Z" fill="#e2e8f0" fill-opacity="0.6" />
+    <!-- Centroamérica y Caribe -->
+    <path d="M 520 540 C 550 560, 570 610, 590 630 C 570 640, 540 600, 510 570 Z" fill="#bfdbfe" fill-opacity="0.45" />
+    <circle cx="620" cy="530" r="12" fill="#bfdbfe" fill-opacity="0.4" />
+    <circle cx="650" cy="545" r="8" fill="#bfdbfe" fill-opacity="0.4" />
+
+    <!-- AMÉRICA DEL SUR -->
+    <path d="M 580 620 
+             C 640 610, 730 630, 770 680 
+             C 810 740, 780 810, 740 870 
+             C 700 920, 660 940, 640 910 
+             C 620 860, 610 780, 590 730 
+             C 570 680, 550 640, 580 620 Z" fill="#bbf7d0" fill-opacity="0.45" />
+
+    <!-- OCEANÍA / AUSTRALIA -->
+    <path d="M 1520 680 
+             C 1600 660, 1690 680, 1720 730 
+             C 1740 780, 1710 840, 1650 860 
+             C 1590 870, 1540 840, 1510 790 
+             C 1490 740, 1480 700, 1520 680 Z" fill="#fbcfe8" fill-opacity="0.45" />
+    <!-- Nueva Zelanda -->
+    <path d="M 1750 840 C 1770 830, 1780 870, 1765 900 C 1750 885, 1745 855, 1750 840 Z" fill="#fbcfe8" fill-opacity="0.4" />
+
+    <!-- ANTÁRTIDA (Margen inferior sutil) -->
+    <path d="M 200 960 C 600 940, 1400 940, 1800 960 C 1800 1000, 200 1000, 200 960 Z" fill="#f1f5f9" fill-opacity="0.7" />
+  </g>
+
+  <!-- Rosa de los vientos / Brújula decorativa muy suave -->
+  <g transform="translate(180, 780)" opacity="0.3" stroke="#64748b" fill="none">
+    <circle cx="0" cy="0" r="45" stroke-width="0.8" stroke-dasharray="2 3" />
+    <circle cx="0" cy="0" r="55" stroke-width="0.5" />
+    <path d="M 0 -60 L 6 -15 L 0 0 L -6 -15 Z" fill="#3b82f6" fill-opacity="0.5" stroke-width="0.5" />
+    <path d="M 0 60 L 6 15 L 0 0 L -6 15 Z" fill="#94a3b8" fill-opacity="0.5" stroke-width="0.5" />
+    <path d="M -60 0 L -15 -6 L 0 0 L -15 6 Z" fill="#94a3b8" fill-opacity="0.5" stroke-width="0.5" />
+    <path d="M 60 0 L 15 -6 L 0 0 L 15 6 Z" fill="#94a3b8" fill-opacity="0.5" stroke-width="0.5" />
+    <text x="-4" y="-68" font-size="12" font-weight="bold" fill="#475569" stroke="none">N</text>
+    <text x="-4" y="80" font-size="12" font-weight="bold" fill="#475569" stroke="none">S</text>
+    <text x="70" y="4" font-size="12" font-weight="bold" fill="#475569" stroke="none">E</text>
+    <text x="-85" y="4" font-size="12" font-weight="bold" fill="#475569" stroke="none">W</text>
+  </g>
+
+</svg>

@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Planificador Anual de Viajes - Sistema Multi-Año</title>
+  <!-- Google Fonts para máxima elegancia con fallback seguro -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=2.2">
+  <!-- Leaflet Map CSS y JS para selección interactiva de puntos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+  <!-- Favicon svg inline -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
+</head>
+<body>
+
+  <!-- HEADER DE LA APLICACIÓN -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-logo">🗺️</div>
+        <div class="brand-titles">
+          <h1>Planificador Anual de Viajes</h1>
+          <p id="headerTravelQuote" class="header-travel-quote" onclick="cycleTravelQuote()" title="Frase inspiradora del día sobre viajes (Haz clic para ver otra)">
+            <span>✨</span> <span>«El mundo es un libro y aquellos que no viajan solo leen una página.» — San Agustín</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Selector de Años y Crear Nuevo Año -->
+      <div class="year-selector-group">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-right: 0.25rem;">Año:</span>
+        <div id="yearButtonsContainer" style="display: flex; gap: 0.25rem;">
+          <!-- Generado dinámicamente -->
+        </div>
+        <button id="btnNewYear" class="new-year-btn" title="Añadir un nuevo año al planificador">
+          <span>+</span> Nuevo Año
+        </button>
+      </div>
+
+      <!-- Acciones de Cabecera -->
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <button id="btnCloudSync" class="btn btn-secondary btn-sm" onclick="openCloudSyncModal()" title="Configuración de sincronización automática en la nube (multi-dispositivo)" style="display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+          <span id="cloudSyncStatusIcon">⚪</span> <span id="cloudSyncStatusText">Sincronizar</span>
+        </button>
+        <button id="btnPrint" class="btn btn-secondary btn-sm" title="Imprimir hoja de ruta o guardar en PDF">
+          🖨️ Imprimir / PDF
+        </button>
+        <button id="btnBackup" class="btn btn-secondary btn-sm" title="Gestionar copias de seguridad JSON">
+          💾 Datos / Backup
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- BARRA DE NAVEGACIÓN POR PESTAÑAS -->
+  <nav class="app-nav">
+    <div class="nav-container">
+      <button class="nav-tab active" data-tab="tab-overview">
+        <span>📊</span> Vista General
+      </button>
+      <button class="nav-tab" data-tab="tab-itineraries">
+        <span>🚗</span> Itinerarios y Alojamientos
+      </button>
+      <button class="nav-tab" data-tab="tab-meals">
+        <span>🍲</span> Banco de Comidas
+      </button>
+      <button class="nav-tab" data-tab="tab-tickets">
+        <span>🎟️</span> Entradas y Actividades
+      </button>
+      <button class="nav-tab" data-tab="tab-expenses">
+        <span>💶</span> Control de Gastos
+      </button>
+      <button class="nav-tab" data-tab="tab-budget">
+        <span>📈</span> Presupuesto y Pagos
+      </button>
+    </div>
+  </nav>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="main-wrapper">
+
+    <!-- PESTAÑA 1: VISTA GENERAL -->
+    <section id="tab-overview" class="tab-content active">
+
+      <!-- BANNER DEL AÑO ACTIVO (REDUCIDO Y COMPACTO - SÓLO VISIBLE EN VISTA GENERAL) -->
+      <section class="year-banner">
+        <div class="year-banner-title">
+          <h2 id="currentYearTitle">Año 2027 - Propuesta de Viajes</h2>
+        </div>
+        <div class="year-banner-actions">
+          <button id="btnAddTrip" class="btn btn-primary btn-sm">
+            <span>+</span> Añadir Viaje a este Año
+          </button>
+          <button id="btnEditYear" class="btn btn-secondary btn-sm">
+            ✏️ Editar Año
+          </button>
+          <button id="btnDeleteYear" class="btn btn-secondary btn-sm" style="color: #e11d48; border-color: #fecdd3;" onclick="openDeleteYearModal()" title="Eliminar este año del planificador con seguridad">
+            🗑️ Eliminar Año
+          </button>
+        </div>
+      </section>
+
+      <!-- ESTADÍSTICAS RÁPIDAS DEL AÑO (5 TARJETAS CON INTRODUCIR GASTO - SÓLO VISIBLE EN VISTA GENERAL) -->
+      <section class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: #eff6ff; color: #2563eb;">🚗</div>
+          <div class="stat-info">
+            <div class="stat-label">Viajes Planificados</div>
+            <div class="stat-value" id="statTotalTrips">0</div>
+            <div class="stat-sub" id="statTripsSub">Opciones activas</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: #ecfdf5; color: #059669;">🌙</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Noches</div>
+            <div class="stat-value" id="statTotalNights">0</div>
+            <div class="stat-sub">En alojamientos / campings</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: #fef3c7; color: #d97706;">💶</div>
+          <div class="stat-info">
+            <div class="stat-label">Coste Alojamientos</div>
+            <div class="stat-value" id="statTotalCost">0,00 €</div>
+            <div class="stat-sub" id="statAvgPerNight">Media 0,00 €/noche</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: #fdf2f8; color: #db2777;">⏳</div>
+          <div class="stat-info">
+            <div class="stat-label">Pendiente de Pago</div>
+            <div class="stat-value" id="statPendingCost">0,00 €</div>
+            <div class="stat-sub" id="statPaidCost">Pagado: 0,00 €</div>
+          </div>
+        </div>
+        <div class="stat-card stat-card-action" onclick="openExpenseModal()" style="cursor: pointer;" title="Registrar un nuevo gasto rápido">
+          <div class="stat-icon" style="background: #eef2ff; color: #4f46e5;">➕</div>
+          <div class="stat-info">
+            <div class="stat-label">Control Rápido</div>
+            <div class="stat-value" style="font-size: 1.15rem; color: #4f46e5;">+ Introducir gasto</div>
+            <div class="stat-sub">Registrar gasto en ruta</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN A: VIAJES Y PROPUESTAS PARA EL AÑO -->
+      <div id="overviewSectionTrips" class="card" style="display: block;">
+        <div class="card-header">
+          <h3 class="card-title" id="overviewTripsScheduleTitle">📌 Viajes y propuestas para el año <span id="overviewTripsTitleYear">2027</span></h3>
+          <span style="font-size: 0.85rem; color: #64748b;">Selecciona un viaje para ver su itinerario y comidas completas</span>
+        </div>
+        <div id="overviewTripsList" class="overview-trips-grid">
+          <!-- Tarjetas de viajes renderizadas dinámicamente -->
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 2: ITINERARIOS Y ALOJAMIENTOS -->
+    <section id="tab-itineraries" class="tab-content" style="display: none;">
+      <!-- Selector del Viaje Activo dentro de la Pestaña -->
+      <div class="card" style="padding: 1rem 1.25rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <strong style="color: #334155; font-size: 0.9rem;">Viaje a consultar:</strong>
+            <div id="tripPillsContainer" class="trip-nav-pills" style="margin-bottom: 0;">
+              <!-- Pills generados dinámicamente -->
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button id="btnEditTripModal" class="btn btn-secondary btn-sm">✏️ Editar Viaje</button>
+            <button id="btnDeleteTripModal" class="btn btn-secondary btn-sm" style="color: #e11d48; border-color: #fecdd3;" onclick="promptDeleteTrip()">🗑️ Eliminar Viaje</button>
+            <button id="btnAddDayModal" class="btn btn-primary btn-sm">+ Añadir Día</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detalle del Alojamiento / Ruta del Viaje Seleccionado -->
+      <div id="tripAccommodationBanner">
+        <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Tabla del Día a Día del Itinerario -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title" id="itineraryTableTitle">🗺️ Hoja de ruta (viaje o etapa asociada)</h3>
+          <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.8rem; color: #64748b;">(1) Distancia y tiempo estimados según Google Maps</span>
+            <button type="button" class="btn-sync-gmaps no-print" onclick="syncItineraryWithGoogleMaps()" title="Recalcular dinámicamente distancias y tiempos de llegada con Google Maps">
+              🔄 Actualizar Google Maps
+            </button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="custom-table" id="itineraryDaysTable">
+            <thead>
+              <tr>
+                <th style="width: 50px;">Día</th>
+                <th style="width: 45px;">D.S.</th>
+                <th style="width: 105px;">Fecha</th>
+                <th>Qué Hacer / Actividad / Trayecto</th>
+                <th style="width: 230px;">Mediodía</th>
+                <th style="width: 230px;">Cena</th>
+                <th style="width: 90px; text-align: center;" class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="itineraryDaysTbody">
+              <!-- Renderizado dinámico de filas del itinerario -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 3: BANCO DE COMIDAS -->
+    <section id="tab-meals" class="tab-content" style="display: none;">
+      <!-- CABECERA DE LA PESTAÑA -->
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 class="card-title">🍲 Banco de Comidas</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+              Banco de recursos, recetas e ideas prácticas para planificar comidas por cuenta propia: tránsitos en ruta, picnics en excursiones, cocina rápida en alojamiento y barbacoas (excluyendo bares y restaurantes).
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button id="btnOpenNewMealResourceModal" class="btn btn-primary btn-sm">+ Añadir Plato / Idea al Banco</button>
+          </div>
+        </div>
+
+        <!-- Barra de Búsqueda y Filtros de Categoría y Etiquetas -->
+        <div style="padding-top: 0.5rem;">
+          <div class="meal-search-bar">
+            <input type="text" id="inputSearchMeals" class="meal-search-input" placeholder="🔍 Buscar plato, ingrediente, etiqueta o idea (ej. pasta, tortilla, barbacoa, sin cocinar...)" oninput="filterMealResources()">
+            <div class="resource-filter-pills" id="resourceFilterPillsContainer">
+              <button class="resource-filter-btn active" data-cat="all" onclick="setMealResourceFilter('all')">🌟 Todos</button>
+              <button class="resource-filter-btn" data-cat="Tránsito" onclick="setMealResourceFilter('Tránsito')">🚗 Tránsito</button>
+              <button class="resource-filter-btn" data-cat="Alojamiento" onclick="setMealResourceFilter('Alojamiento')">🏠 Alojamiento</button>
+              <button class="resource-filter-btn" data-cat="Bar/Restaurante" onclick="setMealResourceFilter('Bar/Restaurante')">🍽️ Bar/Restaurante</button>
+              <button class="resource-filter-btn" data-cat="Picnic" onclick="setMealResourceFilter('Picnic')">🧺 Picnic</button>
+              <button class="resource-filter-btn" data-cat="Barbacoa" onclick="setMealResourceFilter('Barbacoa')">🔥 Barbacoa</button>
+              <button class="resource-filter-btn" data-cat="Otro" onclick="setMealResourceFilter('Otro')">🍴 Otro</button>
+            </div>
+          </div>
+          <!-- Barra Dinámica de Etiquetas (Tags) -->
+          <div id="mealTagFilterBar" class="meal-tag-filter-bar" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed #e2e8f0;">
+            <!-- Renderizado dinámicamente con etiquetas disponibles -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 1: BANCO DE RECURSOS / IDEAS COMPROBADAS -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header" style="border-bottom: 1px solid #f1f5f9; padding-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.2rem;">
+              Banco de Comidas
+            </h4>
+          </div>
+          <span id="mealResourceCountBadge" class="badge badge-indigo" style="font-size: 0.775rem;">Cargando...</span>
+        </div>
+
+        <div id="mealResourceCardsContainer" class="meal-resource-grid">
+          <!-- Renderizado dinámico de tarjetas de recursos -->
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: HISTÓRICO REAL DE MENÚS (ASTURIAS, DISNEY, GIRONA) -->
+      <div class="card" id="historicalMealsCard">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.2rem;">
+              📜 Histórico Real de Menús de Viajes Anteriores
+            </h4>
+            <span style="font-size: 0.8rem; color: #64748b;">
+              Dietarios reales de viajes pasados para inspirar tus días y copiar menús completos.
+            </span>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;" id="historicalTripButtonsContainer">
+            <button class="btn btn-primary btn-sm" id="btnHist_asturias" onclick="switchHistoricalTrip('asturias')">🌲 Asturias 2024 (25 días)</button>
+            <button class="btn btn-secondary btn-sm" id="btnHist_disney" onclick="switchHistoricalTrip('disney')">🏰 Disney 2023 (16 días)</button>
+            <button class="btn btn-secondary btn-sm" id="btnHist_girona" onclick="switchHistoricalTrip('girona')">⛵ Girona 2024 (9 días)</button>
+          </div>
+        </div>
+
+        <!-- Filtro para excluir Restaurantes del histórico -->
+        <div style="background: #f8fafc; border: 1px solid #eef2f6; border-radius: 10px; padding: 0.75rem 1rem; margin: 1rem 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #334155; cursor: pointer;">
+            <input type="checkbox" id="chkFilterOnlyNonRestaurant" checked onchange="toggleHistoricalRestaurantFilter()">
+            <span>🛡️ Filtrar solo comidas caseras / ruta (Excluir comidas de Bar o Restaurante)</span>
+          </label>
+          <span style="font-size: 0.775rem; color: #64748b;">
+            Muestra únicamente los días con comidas de tránsito, picnic, alojamiento y barbacoa.
+          </span>
+        </div>
+
+        <div id="historicalMealsContainer">
+          <!-- Renderizado dinámico de la tabla histórica -->
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 4: ENTRADAS Y ACTIVIDADES -->
+    <section id="tab-tickets" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">🎟️ Entradas, Monumentos y Actividades</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">Control de tickets comprados y reservas pendientes por viaje</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterTicketsTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;" onchange="handleTicketsTripFilterChange(this.value)">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+            <button id="btnAddTicketModal" class="btn btn-primary btn-sm">+ Añadir Entrada</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Viaje / Etapa</th>
+                <th>Entrada / Monumento / Actividad</th>
+                <th>Fecha Compra</th>
+                <th>Fecha Visita</th>
+                <th>Coste (€)</th>
+                <th style="white-space: nowrap; min-width: 120px;">Estado</th>
+                <th>Enlace / Notas</th>
+                <th style="width: 90px; text-align: center;" class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="ticketsTbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700;">
+                <td colspan="4" style="text-align: right;">TOTAL ENTRADAS:</td>
+                <td id="totalTicketsAmount" style="color: #2563eb; font-size: 1rem;">0,00 €</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 5: CONTROL DE GASTOS -->
+    <section id="tab-expenses" class="tab-content" style="display: none;">
+      <!-- LÍNEA 1: MACRO-INDICADORES Y ALOJAMIENTO (5 TARJETAS EN LA MISMA LÍNEA) -->
+      <div class="expenses-stats-row-5" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 0.85rem;">
+        <div class="stat-card" style="padding: 0.85rem 1rem;">
+          <div class="stat-icon" style="background: #eff6ff; color: #2563eb; font-size: 1.15rem; width: 38px; height: 38px;">🚗</div>
+          <div class="stat-info">
+            <div class="stat-label" style="font-size: 0.75rem;">Viajes Planificados</div>
+            <div class="stat-value" id="statExpTotalTrips" style="font-size: 1.25rem;">0</div>
+            <div class="stat-sub" style="font-size: 0.7rem;">Opciones activas</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="padding: 0.85rem 1rem;">
+          <div class="stat-icon" style="background: #ecfdf5; color: #059669; font-size: 1.15rem; width: 38px; height: 38px;">🌙</div>
+          <div class="stat-info">
+            <div class="stat-label" style="font-size: 0.75rem;">Total Noches</div>
+            <div class="stat-value" id="statExpTotalNights" style="font-size: 1.25rem;">0</div>
+            <div class="stat-sub" style="font-size: 0.7rem;">En alojamientos</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="padding: 0.85rem 1rem;">
+          <div class="stat-icon" style="background: #fef3c7; color: #d97706; font-size: 1.15rem; width: 38px; height: 38px;">💶</div>
+          <div class="stat-info">
+            <div class="stat-label" style="font-size: 0.75rem;">Coste Alojamientos</div>
+            <div class="stat-value" id="statExpTotalCost" style="font-size: 1.25rem;">0,00 €</div>
+            <div class="stat-sub" id="statExpAvgPerNight" style="font-size: 0.7rem;">Media por noche</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="padding: 0.85rem 1rem;">
+          <div class="stat-icon" style="background: #fdf2f8; color: #db2777; font-size: 1.15rem; width: 38px; height: 38px;">⏳</div>
+          <div class="stat-info">
+            <div class="stat-label" style="font-size: 0.75rem;">Pendiente de Pago</div>
+            <div class="stat-value" id="statExpPendingCost" style="font-size: 1.25rem; color: #db2777;">0,00 €</div>
+            <div class="stat-sub" id="statExpPaidCost" style="font-size: 0.7rem;">Abonado: 0,00 €</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="background: linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%); border-color: #a7f3d0; padding: 0.85rem 1rem;">
+          <div class="stat-icon" style="background: #d1fae5; color: #065f46; font-size: 1.15rem; width: 38px; height: 38px;">💳</div>
+          <div class="stat-info">
+            <div class="stat-label" style="font-size: 0.75rem;">Total Anticipos y Reservas</div>
+            <div class="stat-value" id="statTotalAdvances" style="font-size: 1.25rem; color: #059669;">0,00 €</div>
+            <div class="stat-sub" id="statAdvancesCount" style="font-size: 0.7rem;">0 anticipos registrados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LÍNEA 2: GASTOS DIARIOS, GASTOS PENDIENTES E INTRODUCIR GASTO (3 TARJETAS EN LA MISMA LÍNEA) -->
+      <div class="expenses-stats-row-3" id="expensesStatsRow3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%); border-color: #bfdbfe;">
+          <div class="stat-icon" style="background: #e0f2fe; color: #0284c7;">💸</div>
+          <div class="stat-info">
+            <div class="stat-label">Gastos Diarios / En Ruta</div>
+            <div class="stat-value" id="statTotalRouteExpenses" style="color: #0284c7;">0,00 €</div>
+            <div class="stat-sub" id="statRouteExpensesCount">Gastos registrados</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%); border-color: #fde68a;">
+          <div class="stat-icon" style="background: #fef3c7; color: #b45309;">🎟️</div>
+          <div class="stat-info">
+            <div class="stat-label">Gastos ENTRADAS</div>
+            <div class="stat-value" id="statTotalPendingExpenses" style="color: #b45309;">0,00 €</div>
+            <div class="stat-sub" id="statPendingExpensesCount">0 pendientes</div>
+          </div>
+        </div>
+
+        <div class="stat-card stat-card-action" onclick="openExpenseModal()" style="cursor: pointer; background: linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%); border-color: #ddd6fe;" title="Registrar un nuevo gasto rápido">
+          <div class="stat-icon" style="background: #eef2ff; color: #4f46e5;">➕</div>
+          <div class="stat-info">
+            <div class="stat-label">Control Rápido</div>
+            <div class="stat-value" style="font-size: 1.2rem; color: #4f46e5;">+ Introducir gasto</div>
+            <div class="stat-sub">Registrar gasto en ruta</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SELECTOR DE APARTADOS EN CONTROL DE GASTOS: BOTONES PARA ALTERNAR SIN SCROLL -->
+      <div class="expenses-toggle-bar" style="display: flex; gap: 0.65rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button id="btnExpSectionRoute" class="btn btn-primary" onclick="switchExpensesSection('route')" style="font-weight: 700; padding: 0.55rem 1.1rem; font-size: 0.9rem;">
+          💸 Gastos Diarios y en Ruta
+        </button>
+        <button id="btnExpSectionAdvances" class="btn btn-secondary" onclick="switchExpensesSection('advances')" style="font-weight: 700; padding: 0.55rem 1.1rem; font-size: 0.9rem;">
+          💳 Anticipos y Pagos por Adelantado
+        </button>
+        <button id="btnExpSectionPending" class="btn btn-secondary" onclick="switchExpensesSection('pending')" style="font-weight: 700; padding: 0.55rem 1.1rem; font-size: 0.9rem;">
+          🎟️ Gastos ENTRADAS
+        </button>
+        <button id="btnExpSectionAll" class="btn btn-secondary" onclick="switchExpensesSection('all')" style="font-weight: 600; padding: 0.55rem 0.9rem; font-size: 0.85rem;" title="Ver los 3 apartados simultáneamente">
+          📑 Ver Todos
+        </button>
+      </div>
+
+      <!-- SECCIÓN 1: REGISTRO DE GASTOS DIARIOS Y EN RUTA (POR DEFECTO ACTIVO) -->
+      <div class="card" id="expensesSectionRoute" style="border-top: 3.5px solid #3b82f6; display: block;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">💸 Gastos Diarios y en Ruta</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+              Desglose de compras, gasolina, peajes, comidas y restaurantes durante el viaje activo.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterRouteExpensesTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+            <button id="btnAddExpenseModal" class="btn btn-primary btn-sm">+ Registrar Gasto</button>
+          </div>
+        </div>
+
+        <!-- Categorías de Gastos Rápidas -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;" id="expenseCategoriesGrid">
+          <!-- Renderizado dinámico de tarjetas de categoría con totales -->
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Viaje / Etapa</th>
+                <th>Concepto / Apartado</th>
+                <th>Categoría</th>
+                <th>Fecha</th>
+                <th>Importe (€)</th>
+                <th style="width: 90px; text-align: center;" class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="expensesTbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700;">
+                <td colspan="4" style="text-align: right;">TOTAL GASTOS EN RUTA:</td>
+                <td id="totalExpensesAmount" style="color: #2563eb; font-size: 1rem;">0,00 €</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: SISTEMA DE ANTICIPOS DE PAGOS -->
+      <div class="card" id="expensesSectionAdvances" style="border-top: 3.5px solid #10b981; display: none;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">💳 Anticipos y Pagos por Adelantado (Reservas y Señales)</h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">
+              Registro de anticipos, señales de camping, reservas anticipadas de apartamentos, vuelos o fianzas.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterAdvanceTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+            <button id="btnAddAdvanceModal" class="btn btn-accent btn-sm">+ Registrar Anticipo</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table" id="advancesTable">
+            <thead>
+              <tr>
+                <th>Viaje</th>
+                <th>Concepto / Detalle</th>
+                <th>Fecha</th>
+                <th>Método de Pago</th>
+                <th>Cantidad (€)</th>
+                <th>Notas / Justificante</th>
+                <th style="width: 90px; text-align: center;" class="no-print">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="advancesTbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot>
+              <tr style="background: #f8fafc; font-weight: 700;">
+                <td colspan="4" style="text-align: right;">TOTAL ANTICIPOS:</td>
+                <td id="totalAdvancesAmount" style="color: #059669; font-size: 1rem;">0,00 €</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: GASTOS ENTRADAS -->
+      <div class="card" id="expensesSectionPending" style="border-top: 3.5px solid #f59e0b; display: none;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">🎟️ Gastos ENTRADAS</h3>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterPendingExpensesTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('tab-tickets')">🎟️ Ir a Entradas y Actividades →</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table" id="pendingExpensesTable">
+            <thead>
+              <tr>
+                <th>Viaje</th>
+                <th>Entrada / Actividad</th>
+                <th>Fecha Prevista</th>
+                <th>Importe (€)</th>
+                <th>Estado</th>
+                <th>Enlace / Reserva</th>
+                <th style="width: 140px; text-align: center;" class="no-print">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="pendingExpensesTbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot>
+              <tr style="background: #fffbeb; font-weight: 700;">
+                <td colspan="3" style="text-align: right; color: #92400e;">TOTAL GASTOS PENDIENTES:</td>
+                <td id="totalPendingExpensesAmount" style="color: #b45309; font-size: 1rem;">0,00 €</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PESTAÑA 6: PRESUPUESTO Y CALENDARIO DE PAGOS -->
+    <section id="tab-budget" class="tab-content" style="display: none;">
+      <!-- SELECTOR DE VISTA: BOTONES PARA ALTERNAR VISTAS SIN SCROLL (UNA SOLA LÍNEA) -->
+      <div class="budget-toggle-bar" style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 0.5rem; margin-bottom: 1.25rem; width: 100%; overflow-x: auto;">
+        <button id="btnBudgetShowSummary" class="btn btn-primary" onclick="switchBudgetView('summary')" style="flex: 1 1 0; min-width: 0; font-weight: 700; padding: 0.55rem 0.5rem; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Resumen general de GASTOS">
+          📊 Resumen general de GASTOS
+        </button>
+        <button id="btnBudgetShowPayments" class="btn btn-secondary" onclick="switchBudgetView('payments')" style="flex: 1 1 0; min-width: 0; font-weight: 700; padding: 0.55rem 0.5rem; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Calendario PAGOS PENDIENTES por meses">
+          📅 Calendario PAGOS PENDIENTES <span id="budgetBtnPaymentsYear">2027</span> por meses
+        </button>
+        <button id="btnBudgetShowYearPayments" class="btn btn-secondary" onclick="switchBudgetView('yearPayments')" style="flex: 1 1 0; min-width: 0; font-weight: 700; padding: 0.55rem 0.5rem; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Calendario de pagos PENDIENTE del año">
+          🗓️ Calendario de pagos PENDIENTE del año <span id="budgetBtnOverviewPaymentsYear">2027</span>
+        </button>
+        <button id="btnBudgetShowFuel" class="btn btn-secondary" onclick="switchBudgetView('fuel')" style="flex: 1 1 0; min-width: 0; font-weight: 700; padding: 0.55rem 0.5rem; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Gasto en COMBUSTIBLE">
+          ⛽ Gasto en COMBUSTIBLE
+        </button>
+      </div>
+
+      <!-- SECCIÓN 1: TABLA RESUMEN GENERAL DE GASTOS (POR DEFECTO PRIMERA) -->
+      <div id="budgetSectionSummary" class="card" style="display: block;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title">📊 Resumen general de GASTOS</h3>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterBudgetTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="custom-table" id="budgetSummaryTable">
+            <thead>
+              <tr>
+                <th>Apartado / Categoría</th>
+                <th style="text-align: center;">Noches / Detalle</th>
+                <th>Presupuesto / Total (€)</th>
+                <th>Media Día (€/día)</th>
+                <th>Pagado (€)</th>
+                <th>Pendiente (€)</th>
+              </tr>
+            </thead>
+            <tbody id="budgetSummaryTbody">
+              <!-- Renderizado dinámico -->
+            </tbody>
+            <tfoot id="budgetSummaryTfoot">
+              <!-- Totalizador dinámico -->
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: CALENDARIO DE PAGOS PENDIENTES POR MESES -->
+      <div id="budgetSectionPayments" class="card" style="display: none;">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title" id="budgetPaymentsScheduleTitle">📅 Calendario PAGOS PENDIENTES <span id="budgetPaymentsYear">2027</span> por meses</h3>
+          </div>
+        </div>
+
+        <div id="budgetScheduleMatrix">
+          <!-- Renderizado dinámico de los meses (Marzo: Bilbao 950€, Julio: Bonterra 1656.98€ + Viana 351€, Agosto: León 841.22€) -->
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: CALENDARIO DE PAGOS PENDIENTE DEL AÑO (DESPLAZADO DESDE VISTA GENERAL) -->
+      <div id="budgetSectionYearPayments" class="card" style="display: none;">
+        <div class="card-header">
+          <h3 class="card-title" id="overviewPaymentsScheduleTitle">🗓️ Calendario de pagos PENDIENTE del año <span id="budgetOverviewPaymentsTitleYear">2027</span></h3>
+        </div>
+        <div id="overviewPaymentsSchedule">
+          <!-- Renderizado dinámicamente -->
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: GASTO EN COMBUSTIBLE -->
+      <div id="budgetSectionFuel" class="card" style="display: none;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 class="card-title">⛽ Gasto en COMBUSTIBLE</h3>
+            <span style="font-size: 0.825rem; color: #64748b;">Calcula el consumo y presupuesto de carburante por viaje o para el total del año</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <select id="filterFuelTripSelect" class="form-control" style="max-width: 260px; padding: 0.4rem 0.65rem; font-size: 0.85rem;" onchange="handleFuelTripChange()">
+              <option value="ALL">Mostrar todos los viajes</option>
+            </select>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items: end;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Kilómetros Totales Estimados:</label>
+            <input type="number" id="calcKm" class="form-control" value="2430" min="0" step="10">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Consumo Medio (L / 100 km):</label>
+            <input type="number" id="calcConsumption" class="form-control" value="7.2" min="1" step="0.1">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Precio Combustible (€ / Litro):</label>
+            <input type="number" id="calcPrice" class="form-control" value="1.65" min="0.5" step="0.01">
+          </div>
+          <div style="background: #eff6ff; padding: 1rem; border-radius: 10px; border: 1px solid #bfdbfe;">
+            <div style="font-size: 0.775rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">Gasto en Gasolina Estimado</div>
+            <div id="calcTotalFuelCost" style="font-size: 1.5rem; font-weight: 800; color: #1e3a8a;">288,68 €</div>
+            <div id="calcLiters" style="font-size: 0.75rem; color: #3b82f6;">Consumo total: ~175 litros</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: GESTIÓN DE DÍA DE ITINERARIO -->
+  <div id="modalDay" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalDayTitle">Editar Día de Itinerario</h3>
+        <button class="modal-close" onclick="closeModal('modalDay')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formDay">
+          <input type="hidden" id="dayEditIndex" value="-1">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Número de Día:</label>
+              <input type="number" id="inputDayNum" class="form-control" required min="1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Día de la Semana (L, M, X, J, V, S, D):</label>
+              <input type="text" id="inputDayWeekDay" class="form-control" placeholder="Ej. V" maxlength="2">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha:</label>
+              <input type="date" id="inputDayDate" class="form-control">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Qué Hacer / Actividad General del Día:</label>
+            <textarea id="inputDayPlan" class="form-control" rows="2" placeholder="Ej. Salida por la mañana hacia Bilbao, visita al Guggenheim y paseo por el Casco Viejo..."></textarea>
+          </div>
+          <!-- GESTOR DINÁMICO DE LÍNEAS DE ACTIVIDAD Y RUTAS ASOCIADAS -->
+          <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.75rem; margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; flex-wrap: wrap; gap: 0.4rem;">
+              <span style="font-weight: 700; color: #1e293b; font-size: 0.8rem;">📋 Líneas de Actividades del Día (arrastra ⋮⋮ para ordenar)</span>
+              <button type="button" class="btn btn-sm btn-primary" onclick="addModalActivityLine()" style="font-size: 0.725rem; padding: 0.2rem 0.55rem; font-weight: 600;">+ Añadir Línea de Actividad</button>
+            </div>
+            <div id="modalActivitiesList" style="display: flex; flex-direction: column; gap: 0.35rem;">
+              <!-- Se generarán dinámicamente -->
+            </div>
+          </div>
+          <!-- SECCIÓN: RUTA GOOGLE MAPS, SALIDA Y PARADAS ESTIMADAS -->
+          <div style="background: #f8fafc; border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 0.85rem; margin-bottom: 0.85rem;">
+            <div style="font-size: 0.825rem; font-weight: 700; color: #1e40af; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+              <span>🗺️ Configuración de Ruta Principal / Global del Día (Google Maps)</span>
+              <a id="linkDayGmapsLive" href="#" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: #2563eb; text-decoration: underline; font-weight: 600;">Ver en Google Maps ↗</a>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label" style="font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                  <span>📍 Punto de Salida (Origen):</span>
+                  <span style="display: flex; gap: 0.25rem;">
+                    <button type="button" class="btn-picker-link btn-xs" onclick="openMapPickerModal('inputDayOrigin', 'Punto de Salida')" title="Marcar punto en el mapa interactivo o pegar de Google Maps">📍 Marcar</button>
+                    <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="btn-picker-link gmaps btn-xs" title="Abrir Google Maps para buscar">🗺️ Maps ↗</a>
+                  </span>
+                </label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="inputDayOrigin" class="form-control" style="padding-right: 28px;" placeholder="Escribe dirección o ciudad..." oninput="updateModalRoutePreview()">
+                  <button type="button" class="btn-clear-field" onclick="clearRouteField('inputDayOrigin')" title="Eliminar punto de salida">&times;</button>
+                </div>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label" style="font-size: 0.775rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                  <span>🏁 Punto de Llegada (Destino):</span>
+                  <span style="display: flex; gap: 0.25rem;">
+                    <button type="button" class="btn-picker-link btn-xs" onclick="openMapPickerModal('inputDayDestination', 'Punto de Llegada')" title="Marcar punto en el mapa interactivo o pegar de Google Maps">📍 Marcar</button>
+                    <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="btn-picker-link gmaps btn-xs" title="Abrir Google Maps para buscar">🗺️ Maps ↗</a>
+                  </span>
+                </label>
+                <div style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="inputDayDestination" class="form-control" style="padding-right: 28px;" placeholder="Escribe dirección o ciudad..." oninput="updateModalRoutePreview()">
+                  <button type="button" class="btn-clear-field" onclick="clearRouteField('inputDayDestination')" title="Eliminar punto de llegada">&times;</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 0.4rem;">
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label" style="font-size: 0.775rem;">⏰ Hora de Salida:</label>
+                <input type="time" id="inputDayDepartureTime" class="form-control" value="09:00" oninput="updateModalRoutePreview()">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label" style="font-size: 0.775rem;">🛑 Nº de Paradas (desplegable):</label>
+                <select id="inputDayStopCount" class="form-control" style="font-size: 0.8rem;" onchange="handleStopCountChange('inputDay')">
+                  <option value="0">0 paradas (directo)</option>
+                  <option value="1">1 parada</option>
+                  <option value="2">2 paradas</option>
+                  <option value="3">3 paradas</option>
+                  <option value="4">4 paradas</option>
+                  <option value="5">5 paradas</option>
+                  <option value="6">6+ paradas</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label class="form-label" style="font-size: 0.775rem;">⏱️ Tiempo de Paradas:</label>
+                <input type="time" id="inputDayStopMinutes" class="form-control" value="00:00" step="300" oninput="updateModalRoutePreview()">
+              </div>
+            </div>
+            <!-- Vista previa de los dos cálculos de llegada -->
+            <div id="modalRouteLiveCard" style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.6rem 0.85rem; margin-top: 0.6rem; display: flex; flex-wrap: wrap; gap: 0.6rem; font-size: 0.775rem; align-items: center;">
+              <span id="previewDistKm">🚗 Distancia: <strong>0 km</strong></span>
+              <span>•</span>
+              <span id="previewDriveTime">⏱️ En ruta: <strong>0 min</strong></span>
+              <span>•</span>
+              <span id="previewDirectArrival" style="background: #eff6ff; color: #1e40af; padding: 0.15rem 0.45rem; border-radius: 5px; font-weight: 600;">🏁 Llegada directa: <strong>09:00</strong></span>
+              <span>•</span>
+              <span id="previewStopsArrival" style="background: #f0fdf4; color: #166534; padding: 0.15rem 0.45rem; border-radius: 5px; font-weight: 600;">🛑 Con paradas: <strong>09:00</strong></span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+              <label class="form-label">🔗 Enlace Web / URL de la Actividad o Información:</label>
+              <input type="url" id="inputDayUrl" class="form-control" placeholder="https://ejemplo.com/entradas-o-info">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">Texto del Enlace (opcional):</label>
+              <input type="text" id="inputDayUrlTitle" class="form-control" placeholder="Ej. Ver web oficial, Comprar entradas...">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mediodía:</label>
+            <div style="display: grid; grid-template-columns: 190px 1fr; gap: 0.65rem;">
+              <select id="selectDayLunchType" class="form-control">
+                <option value="">(Ninguno / Nada)</option>
+                <option value="Tránsito">Tránsito</option>
+                <option value="Alojamiento">Alojamiento</option>
+                <option value="Bar/Restaurante">Bar/Restaurante</option>
+                <option value="Picnic">Picnic</option>
+                <option value="Barbacoa">Barbacoa</option>
+                <option value="Otro">Otro...</option>
+              </select>
+              <input type="text" id="inputDayLunchDetail" class="form-control" placeholder="Información adicional (ej. Bocadillos en ruta, Pintxos...)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cena:</label>
+            <div style="display: grid; grid-template-columns: 190px 1fr; gap: 0.65rem;">
+              <select id="selectDayDinnerType" class="form-control">
+                <option value="">(Ninguno / Nada)</option>
+                <option value="Alojamiento">Alojamiento</option>
+                <option value="Bar/Restaurante">Bar/Restaurante</option>
+                <option value="Barbacoa">Barbacoa</option>
+                <option value="Tránsito">Tránsito</option>
+                <option value="Picnic">Picnic</option>
+                <option value="Otro">Otro...</option>
+              </select>
+              <input type="text" id="inputDayDinnerDetail" class="form-control" placeholder="Información adicional (ej. Cena rápida, Barbacoa en parcela...)">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalDay')">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveDay">Guardar Día</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL RÁPIDO: CONFIGURAR RUTA, SALIDA Y PARADAS (GOOGLE MAPS) -->
+  <div id="modalDayRoute" class="modal-overlay">
+    <div class="modal-box" style="max-width: 520px; border-top: 4px solid #3b82f6;">
+      <div class="modal-header">
+        <h3 id="modalDayRouteTitle" style="color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+          🗺️ Establecer Ruta y Paradas (Google Maps)
+        </h3>
+        <button class="modal-close" onclick="closeModal('modalDayRoute')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="routeModalDayIndex" value="-1">
+        <input type="hidden" id="routeModalActivityIndex" value="0">
+        <div id="routeModalActivitySelectorRow" class="form-group" style="display: none; margin-bottom: 0.75rem; background: #eff6ff; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #bfdbfe;">
+          <label class="form-label" style="font-weight: 700; color: #1e40af; margin-bottom: 0.25rem;">🎯 Línea de Actividad a Configurar:</label>
+          <select id="routeModalActivitySelect" class="form-control" onchange="switchRouteModalActivity(this.value)"></select>
+        </div>
+        <!-- Opción: Actividad sin desplazamiento -->
+        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.75rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 700; color: #1e293b; cursor: pointer; margin: 0;">
+            <input type="checkbox" id="routeModalNoDisplacement" onchange="toggleRouteModalNoDisplacement(this.checked)" style="width: 17px; height: 17px; accent-color: #2563eb; cursor: pointer;">
+            <span>🚶 Esta actividad no está asociada a ningún desplazamiento (actividad local / en destino)</span>
+          </label>
+          <div style="font-size: 0.75rem; color: #64748b; margin-left: 1.6rem; margin-top: 0.15rem;">
+            Si se activa, no se requerirá punto de salida ni llegada y no se computará desplazamiento en la Hoja de Ruta.
+          </div>
+        </div>
+
+        <div id="routeModalNoDisplacementNotice" style="display: none; padding: 1rem; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; text-align: center; color: #166534; font-size: 0.875rem; margin-bottom: 0.75rem;">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">🚶 Actividad local sin desplazamiento</div>
+          <div style="font-size: 0.8rem; color: #15803d;">Esta línea de actividad se realizará en el propio destino o alojamiento. En la Hoja de Ruta se mostrará únicamente el texto de la actividad sin tarjeta de ruta.</div>
+        </div>
+
+        <div id="routeModalFieldsContainer">
+          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.85rem;">
+            Establece los puntos de salida y llegada para calcular la distancia y tiempos mediante Google Maps, y define las paradas estimadas para obtener el segundo cálculo de hora de llegada.
+          </p>
+          <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span>📍 Punto de Salida (Origen):</span>
+              <span style="display: flex; gap: 0.35rem;">
+                <button type="button" class="btn-picker-link" onclick="openMapPickerModal('routeModalOrigin', 'Punto de Salida')" title="Marcar punto en el mapa interactivo o pegar de Google Maps">📍 Marcar en mapa</button>
+                <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="btn-picker-link gmaps" title="Abrir Google Maps para buscar">🗺️ Google Maps ↗</a>
+              </span>
+            </label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="text" id="routeModalOrigin" class="form-control" style="padding-right: 28px;" placeholder="Escribe dirección o ciudad (ej. Castellón, Galdakao)..." oninput="updateDedicatedRouteModalPreview()">
+              <button type="button" class="btn-clear-field" onclick="clearRouteField('routeModalOrigin')" title="Eliminar punto de salida">&times;</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0.75rem;">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span>🏁 Punto de Llegada (Destino):</span>
+              <span style="display: flex; gap: 0.35rem;">
+                <button type="button" class="btn-picker-link" onclick="openMapPickerModal('routeModalDestination', 'Punto de Llegada')" title="Marcar punto en el mapa interactivo o pegar de Google Maps">📍 Marcar en mapa</button>
+                <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="btn-picker-link gmaps" title="Abrir Google Maps para buscar">🗺️ Google Maps ↗</a>
+              </span>
+            </label>
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="text" id="routeModalDestination" class="form-control" style="padding-right: 28px;" placeholder="Escribe dirección o ciudad (ej. Bilbao, San Sebastián)..." oninput="updateDedicatedRouteModalPreview()">
+              <button type="button" class="btn-clear-field" onclick="clearRouteField('routeModalDestination')" title="Eliminar punto de llegada">&times;</button>
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom: 0.75rem;">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">⏰ Hora de Salida:</label>
+              <input type="time" id="routeModalDepartureTime" class="form-control" value="09:00" oninput="updateDedicatedRouteModalPreview()">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">🛑 Nº de Paradas (desplegable):</label>
+              <select id="routeModalStopCount" class="form-control" onchange="handleStopCountChange('routeModal')">
+                <option value="0">0 paradas (directo)</option>
+                <option value="1">1 parada</option>
+                <option value="2">2 paradas</option>
+                <option value="3">3 paradas</option>
+                <option value="4">4 paradas</option>
+                <option value="5">5 paradas</option>
+                <option value="6">6+ paradas</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label">⏱️ Tiempo de Paradas:</label>
+              <input type="time" id="routeModalStopMinutes" class="form-control" value="00:00" step="300" oninput="updateDedicatedRouteModalPreview()">
+            </div>
+          </div>
+          <!-- Card de cálculo en vivo -->
+          <div id="dedicatedRouteLiveCard" style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 8px; padding: 0.85rem; margin-top: 0.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <span style="font-weight: 700; color: #0369a1; font-size: 0.8rem;">CÁLCULO DINÁMICO GOOGLE MAPS</span>
+              <a id="routeModalGmapsLink" href="#" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: #0284c7; font-weight: 600; text-decoration: underline;">
+                🗺️ Comprobar en Google Maps ↗
+              </a>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">
+              <div style="background: white; padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="color: #64748b; font-size: 0.7rem; margin-bottom: 0.2rem;">
+                  🚗 Distancia por carretera:
+                </div>
+                <strong id="routeModalDist" style="color: #0f172a; font-size: 1.05rem;">- km</strong>
+                <input type="hidden" id="routeModalCustomDist" value="">
+                <div style="font-size: 0.65rem; color: #0284c7; margin-top: 0.15rem;">(Cálculo automático Google Maps)</div>
+              </div>
+              <div style="background: white; padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="color: #64748b; font-size: 0.7rem; margin-bottom: 0.2rem;">
+                  ⏱️ Tiempo neto conducción:
+                </div>
+                <strong id="routeModalDuration" style="color: #0f172a; font-size: 1.05rem;">- min</strong>
+                <input type="hidden" id="routeModalCustomDuration" value="">
+                <div style="font-size: 0.65rem; color: #0284c7; margin-top: 0.15rem;">(Cálculo automático Google Maps)</div>
+              </div>
+              <div style="background: #eff6ff; padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid #bfdbfe;">
+                <div style="color: #1e40af; font-size: 0.7rem; margin-bottom: 0.2rem;">🏁 1er Cálculo: Llegada directa:</div>
+                <strong id="routeModalDirectArrival" style="color: #1d4ed8; font-size: 1.05rem;">--:--</strong>
+                <div style="font-size: 0.65rem; color: #3b82f6; margin-top: 0.15rem;">(Sin paradas)</div>
+              </div>
+              <div style="background: #f0fdf4; padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+                <div style="color: #166534; font-size: 0.7rem; margin-bottom: 0.2rem;">🛑 2º Cálculo: Con paradas estimadas:</div>
+                <strong id="routeModalStopsArrival" style="color: #15803d; font-size: 1.05rem;">--:--</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acceso directo a Ruta Marcada en Google Maps (solamente enlace) -->
+        <div id="routeModalLiveMapCard" style="margin-top: 0.75rem; border-radius: 8px; border: 1.5px solid #bae6fd; background: #f0f9ff; padding: 0.65rem 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-size: 0.825rem; font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 0.4rem;">
+            <span>🗺️</span> <span>Ruta Marcada:</span>
+          </div>
+          <a id="routeModalLiveMapExternalLink" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="background: #0284c7; border-color: #0284c7; font-size: 0.775rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 6px;">
+            <span>Abrir ruta completa en Google Maps</span> <span>↗</span>
+          </a>
+          <iframe id="routeModalLiveMapIframe" 
+                  src="about:blank" 
+                  style="display: none;" 
+                  loading="lazy">
+          </iframe>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalDayRoute')">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="saveDayRouteFromDedicatedModal()">Guardar Ruta y Tiempos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MARCAR PUNTO EN EL MAPA INTERACTIVO / GOOGLE MAPS -->
+  <div id="modalMapPicker" class="modal-overlay">
+    <div class="modal-box" style="max-width: 720px; width: 95%; max-height: 92vh; display: flex; flex-direction: column; border-top: 4px solid #0284c7;">
+      <div class="modal-header" style="padding: 0.85rem 1.25rem;">
+        <h3 id="modalMapPickerTitle" style="color: #0369a1; display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.1rem;">
+          📍 Marcar Punto en el Mapa
+        </h3>
+        <button class="modal-close" onclick="closeModal('modalMapPicker')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 1rem 1.25rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+        
+        <!-- Búsqueda y Enlace a Google Maps -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem;">
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem;">
+              <span>🔍 Buscar o Pegar desde Google Maps</span>
+            </div>
+            <a id="btnOpenExternalGoogleMaps" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" 
+               class="btn btn-sm" style="background: #0284c7; color: white; text-decoration: none; font-size: 0.775rem; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 5px; display: inline-flex; align-items: center; gap: 0.35rem;">
+              🗺️ Abrir Google Maps para explorar ↗
+            </a>
+          </div>
+          <div style="display: flex; gap: 0.4rem;">
+            <input type="text" id="mapPickerSearchInput" class="form-control" 
+                   placeholder="Escribe un lugar o pega enlace/coordenadas de Google Maps (ej. Bilbao, 43.26,-2.93)..." 
+                   style="font-size: 0.85rem;" 
+                   onkeydown="if(event.key==='Enter'){event.preventDefault(); handleMapPickerSearch();}">
+            <button type="button" class="btn btn-primary btn-sm" onclick="handleMapPickerSearch()" style="white-space: nowrap;">
+              Buscar / Aplicar
+            </button>
+          </div>
+          <!-- Chips sugeridos rápidos -->
+          <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; align-items: center;">
+            <span style="font-size: 0.725rem; color: #64748b; font-weight: 600;">Lugares frecuentes:</span>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('Castellón', 39.9864, -0.0513)">Castellón</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('Bilbao', 43.2630, -2.9350)">Bilbao</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('Galdakao', 43.2305, -2.8451)">Galdakao</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('San Sebastián', 43.3183, -1.9812)">San Sebastián</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('San Juan de Gaztelugatxe', 43.4475, -2.7850)">Gaztelugatxe</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('Vitoria-Gasteiz', 42.8467, -2.6716)">Vitoria</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('Potes', 43.1539, -4.6236)">Potes</button>
+            <button type="button" class="map-chip-btn" onclick="selectMapPreset('León', 42.5987, -5.5671)">León</button>
+          </div>
+        </div>
+
+        <!-- Contenedor del Mapa Interactivo: permite marcar cualquier punto en el mapa -->
+        <div style="position: relative; border-radius: 8px; overflow: hidden; border: 1.5px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: #f8fafc;">
+          <div id="mapPickerLeaflet" style="width: 100%; height: 370px; z-index: 1;"></div>
+          <iframe id="mapPickerGmapsIframe" 
+                  src="https://maps.google.com/maps?q=Castellon&t=&z=13&ie=UTF8&iwloc=&output=embed" 
+                  style="width: 100%; height: 370px; border: none; display: none;" 
+                  loading="lazy">
+          </iframe>
+          <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.96); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; color: #1e293b; z-index: 1000; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+            <span>📍 <strong>Haz clic en cualquier punto del mapa</strong> o arrastra el marcador para seleccionar cualquier lugar exacto.</span>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setMapTileLayer('esri')" title="Capa callejero detallado">Calles</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setMapTileLayer('satellite')" title="Capa fotografía aérea / satélite">Satélite</button>
+              <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setMapTileLayer('osm')" title="Capa OpenStreetMap">OSM</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen del punto marcado -->
+        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <div style="font-size: 0.725rem; color: #166534; font-weight: 700; text-transform: uppercase;">Punto Seleccionado</div>
+            <div id="mapPickerSelectedName" style="font-size: 1rem; font-weight: 700; color: #0f172a;">Castellón</div>
+            <div id="mapPickerSelectedCoords" style="font-size: 0.75rem; color: #64748b; font-family: monospace;">Lat: 39.9864, Lng: -0.0513</div>
+          </div>
+          <div style="display: flex; gap: 0.4rem;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="clearMapPickerSelection()">Limpiar / Vaciar</button>
+            <button type="button" class="btn btn-primary" onclick="confirmMapPickerSelection()" style="background: #16a34a; border-color: #16a34a; font-weight: 600;">
+              ✓ Usar este punto
+            </button>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer" style="padding: 0.75rem 1.25rem;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalMapPicker')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTIÓN DE ENTRADA -->
+  <div id="modalTicket" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalTicketTitle">Añadir Entrada / Actividad</h3>
+        <button class="modal-close" onclick="closeModal('modalTicket')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formTicket">
+          <input type="hidden" id="ticketEditId" value="">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Viaje al que corresponde:</label>
+              <select id="inputTicketTripId" class="form-control" required onchange="handleTicketTripChange()">
+                <!-- Opciones de viajes cargadas dinámicamente -->
+              </select>
+            </div>
+            <div class="form-group" id="ticketStageGroup">
+              <label class="form-label">Etapa (opcional):</label>
+              <select id="inputTicketStageId" class="form-control">
+                <!-- Opciones de etapas cargadas dinámicamente -->
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre del Monumento / Actividad:</label>
+            <input type="text" id="inputTicketName" class="form-control" required placeholder="Ej. Museo Guggenheim Bilbao">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha de Compra:</label>
+              <input type="date" id="inputTicketPurchaseDate" class="form-control">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha de Visita:</label>
+              <input type="date" id="inputTicketVisitDate" class="form-control">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Coste Total (€):</label>
+              <input type="number" id="inputTicketCost" class="form-control" min="0" step="0.5" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estado:</label>
+              <select id="inputTicketStatus" class="form-control">
+                <option value="Pendiente">Pendiente de Comprar</option>
+                <option value="Comprada">Comprada / Confirmada</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Enlace Web / Reserva:</label>
+            <input type="url" id="inputTicketLink" class="form-control" placeholder="https://...">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalTicket')">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveTicket">Guardar Entrada</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTIÓN DE GASTO -->
+  <div id="modalExpense" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalExpenseTitle">Registrar Gasto</h3>
+        <button class="modal-close" onclick="closeModal('modalExpense')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formExpense">
+          <input type="hidden" id="expenseEditId" value="">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Viaje al que corresponde:</label>
+              <select id="inputExpenseTripId" class="form-control" required onchange="handleExpenseTripChange()">
+                <!-- Opciones de viajes cargadas dinámicamente -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Etapa (opcional):</label>
+              <select id="inputExpenseStageId" class="form-control">
+                <option value="">— Sin etapa / General del viaje —</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Concepto del Gasto:</label>
+            <input type="text" id="inputExpenseConcept" class="form-control" required placeholder="Ej. Compra supermercado, Gasolina ida...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Categoría:</label>
+              <select id="inputExpenseCategory" class="form-control">
+                <option value="Gasolina">Gasolina</option>
+                <option value="Peajes">Peajes</option>
+                <option value="Compras">Compras / Supermercado</option>
+                <option value="Restaurantes">Restaurantes</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Otros">Otros (cafés, recuerdos...)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Importe (€):</label>
+              <input type="number" id="inputExpenseAmount" class="form-control" min="0" step="0.1" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha:</label>
+              <input type="date" id="inputExpenseDate" class="form-control">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalExpense')">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveExpense">Guardar Gasto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR / EDITAR VIAJE -->
+  <div id="modalTrip" class="modal-overlay">
+    <div class="modal-box" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 id="modalTripTitle">Modificar Datos Generales del Viaje</h3>
+        <button class="modal-close" onclick="closeModal('modalTrip')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formTrip">
+          <input type="hidden" id="tripEditId" value="">
+          <div class="form-group">
+            <label class="form-label">Nombre del Viaje / Destino:</label>
+            <input type="text" id="inputTripName" class="form-control" required placeholder="Ej. País Vasco (SS27)">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Categoría / Época:</label>
+              <input type="text" id="inputTripCategory" class="form-control" placeholder="Ej. Semana Santa, Verano, Puente">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Periodo o Fechas (Texto):</label>
+              <input type="text" id="inputTripPeriod" class="form-control" placeholder="Ej. 26/03/2027 - 03/04/2027">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha Inicio Prevista (para orden cronológico):</label>
+              <input type="date" id="inputTripStartDate" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha Fin Prevista:</label>
+              <input type="date" id="inputTripEndDate" class="form-control">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Origen:</label>
+              <input type="text" id="inputTripOrigin" class="form-control" placeholder="Ej. Castellón">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Destino Principal:</label>
+              <input type="text" id="inputTripDestination" class="form-control" placeholder="Ej. Galdakao">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Distancia Estimada (km):</label>
+              <input type="number" id="inputTripDistanceKm" class="form-control" placeholder="Ej. 620">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tiempo Estimado de Ruta:</label>
+              <input type="text" id="inputTripEstimatedTime" class="form-control" placeholder="Ej. 6h 15m (Google Maps)">
+            </div>
+          </div>
+
+          <!-- SELECTOR DE MODALIDAD: ESTANCIA ÚNICA O POR ETAPAS -->
+          <div class="form-group" style="margin-top: 0.85rem; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 10px; border: 1.5px solid #e2e8f0;">
+            <label class="form-label" style="font-weight: 700; color: #1e293b; margin-bottom: 0.4rem;">
+              🗺️ Modalidad de Alojamiento y Planificación:
+            </label>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+              <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; font-size: 0.875rem; font-weight: 600; color: #334155;">
+                <input type="radio" name="radioTripMode" id="radioTripModeSingle" value="single" checked onchange="handleTripModeChange('single')">
+                <span>🏠 Estancia Única (Un solo alojamiento / cámping)</span>
+              </label>
+              <label style="display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; font-size: 0.875rem; font-weight: 600; color: #4338ca;">
+                <input type="radio" name="radioTripMode" id="radioTripModeStages" value="stages" onchange="handleTripModeChange('stages')">
+                <span>🗺️ Viaje Itinerante con Etapas</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SECCIÓN DINÁMICA DE ALOJAMIENTO / ETAPAS -->
+          <div id="tripAccommodationFieldsContainer" style="margin-top: 1rem; border-top: 1px dashed #cbd5e1; padding-top: 0.75rem;">
+            <!-- Contenido dinámico generado por renderTripAccommodationFields() -->
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button type="button" id="btnDeleteTripFromModal" class="btn btn-secondary btn-sm" style="color: #e11d48; border-color: #fecdd3; display: none;">🗑️ Eliminar Viaje</button>
+        <div style="display: flex; gap: 0.5rem; margin-left: auto;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalTrip')">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnSaveTrip" onclick="handleSaveTrip(event)">Guardar Datos Generales</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTIÓN DE ANTICIPO DE PAGO -->
+  <div id="modalAdvance" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modalAdvanceTitle">Registrar Anticipo de Pago</h3>
+        <button class="modal-close" onclick="closeModal('modalAdvance')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formAdvance">
+          <input type="hidden" id="advanceEditId" value="">
+          <div class="form-group">
+            <label class="form-label">Viaje Destino del Anticipo:</label>
+            <select id="inputAdvanceTripId" class="form-control" required>
+              <!-- Rellenado dinámicamente con los viajes del año activo -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Concepto o Motivo del Anticipo:</label>
+            <input type="text" id="inputAdvanceConcept" class="form-control" required placeholder="Ej. Señal reserva parcela camping, Primer plazo Airbnb, Fianza...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha del Pago / Anticipo:</label>
+              <input type="date" id="inputAdvanceDate" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Método de Pago:</label>
+              <select id="inputAdvanceMethod" class="form-control">
+                <option value="TPV virtual">TPV virtual (Online / Enlace pasarela)</option>
+                <option value="Tarjeta">Tarjeta Bancaria (Débito / Crédito)</option>
+                <option value="Transferencia">Transferencia Bancaria</option>
+                <option value="Bizum">Bizum</option>
+                <option value="Efectivo">Efectivo / Metálico</option>
+                <option value="Airbnb / Booking">Plataforma (Airbnb / Booking)</option>
+                <option value="Presencial">Presencial / En mano</option>
+                <option value="Otro">Otro método</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Cantidad Abonada (€):</label>
+              <input type="number" id="inputAdvanceAmount" class="form-control" min="0" step="0.01" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Referencia / Justificante / Notas:</label>
+              <input type="text" id="inputAdvanceNotes" class="form-control" placeholder="Ej. Justificante TPV nº 2026-09 o código de reserva">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAdvance')">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnSaveAdvance">Guardar Anticipo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMACIÓN PARA ELIMINAR VIAJE -->
+  <div id="modalDeleteTrip" class="modal-overlay">
+    <div class="modal-box" style="max-width: 520px; border-top: 4px solid #f43f5e;">
+      <div class="modal-header">
+        <h3 style="color: #9f1239; display: flex; align-items: center; gap: 0.5rem;">
+          <span>⚠️</span> Confirmar Eliminación de Viaje
+        </h3>
+        <button class="modal-close" onclick="closeModal('modalDeleteTrip')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="deleteTripTargetId" value="">
+        <p style="font-size: 0.95rem; color: #1e293b; margin-bottom: 0.75rem;">
+          ¿Estás seguro de que deseas eliminar permanentemente el viaje <strong id="deleteTripTargetName" style="color: #be123c;"></strong>?
+        </p>
+        <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 1rem; font-size: 0.85rem; color: #881337; margin-bottom: 1rem;">
+          <strong>⚠️ Esta acción no se puede deshacer:</strong>
+          <ul style="margin-left: 1.25rem; margin-top: 0.5rem; line-height: 1.5; list-style-type: disc;">
+            <li>Se eliminará toda la hoja de ruta y los días de itinerario.</li>
+            <li>Se perderán los menús y dietarios de comidas planificados.</li>
+            <li>Se borrarán las entradas, tickets y reservas del viaje.</li>
+            <li>Se suprimirán los gastos y anticipos registrados de este viaje.</li>
+          </ul>
+        </div>
+        <p style="font-size: 0.85rem; color: #64748b;">
+          Por seguridad para evitar errores accidentales, debes confirmar la acción haciendo clic a continuación.
+        </p>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalDeleteTrip')">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnConfirmDeleteTrip">🗑️ Sí, Eliminar Viaje Definitivamente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AÑADIR NUEVO AÑO -->
+  <div id="modalNewYear" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Añadir Nuevo Año de Planificación</h3>
+        <button class="modal-close" onclick="closeModal('modalNewYear')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Año (ej. 2028, 2029):</label>
+          <input type="number" id="inputNewYearNum" class="form-control" min="2020" max="2050" value="2028">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Título o Descripción del Año:</label>
+          <input type="text" id="inputNewYearName" class="form-control" placeholder="Ej. Año 2028 - Propuesta de Viajes">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Plantilla Inicial:</label>
+          <select id="selectYearTemplate" class="form-control">
+            <option value="empty" selected>Año en blanco (sin datos de viajes anteriores)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalNewYear')">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmNewYear">Crear Año</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: COPIA DE SEGURIDAD Y DATOS -->
+  <div id="modalBackup" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Copia de Seguridad y Datos (JSON)</h3>
+        <button class="modal-close" onclick="closeModal('modalBackup')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.875rem; color: #475569; margin-bottom: 1rem;">
+          Tus datos se guardan automáticamente en tu navegador. Desde aquí puedes exportar un archivo de respaldo o restaurar datos en otro equipo.
+        </p>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+          <button id="btnExportJSON" class="btn btn-primary">
+            ⬇️ Descargar Copia de Seguridad (.json)
+          </button>
+          <label class="btn btn-secondary" style="cursor: pointer; margin-bottom: 0;">
+            ⬆️ Cargar Archivo (.json)
+            <input type="file" id="inputFileJSON" accept=".json" style="display: none;">
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalBackup')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AÑADIR O MODIFICAR PLATO AL BANCO DE COMIDAS -->
+  <div id="modalNewMealResource" class="modal-overlay">
+    <div class="modal-box" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 id="modalMealResourceTitle">💡 Añadir Plato al Banco de Comidas</h3>
+        <button class="modal-close" onclick="closeModal('modalNewMealResource')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formNewMealResource" onsubmit="handleSaveMealResource(event)">
+          <input type="hidden" id="inputEditMealResourceId" value="">
+          <div class="form-group">
+            <label class="form-label">Nombre del Plato / Idea:</label>
+            <input type="text" id="inputNewResourceName" class="form-control" required placeholder="Ej. Lasaña casera precocinada, Ensaladilla rusa...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría Principal:</label>
+            <select id="selectNewResourceType" class="form-control" required>
+              <option value="Tránsito">🚗 Tránsito</option>
+              <option value="Alojamiento">🏠 Alojamiento</option>
+              <option value="Bar/Restaurante">🍽️ Bar/Restaurante</option>
+              <option value="Picnic">🧺 Picnic</option>
+              <option value="Barbacoa">🔥 Barbacoa</option>
+              <option value="Otro">🍴 Otro</option>
+            </select>
+          </div>
+
+          <!-- GESTIÓN Y SELECCIÓN DE ETIQUETAS DINÁMICAS (MULTI-SELECCIÓN Y CREACIÓN) -->
+          <div class="form-group" style="margin-top: 0.85rem;">
+            <label class="form-label" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+              <span>🏷️ Etiquetas (selecciona o crea nuevas según tus necesidades):</span>
+            </label>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <input type="text" id="inputNewCustomTag" class="form-control" placeholder="Escribe nueva etiqueta (ej. Rápido, Táper frío, Niños...)" style="font-size: 0.85rem; padding: 0.35rem 0.65rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();createAndSelectMealTag();}">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="createAndSelectMealTag()" style="white-space: nowrap;">+ Añadir Etiqueta</button>
+            </div>
+            <div id="suggestedMealTagsContainer" style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+              <!-- Botones de etiquetas renderizados dinámicamente -->
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.85rem;">
+            <label class="form-label">Consejos prácticos o Notas:</label>
+            <textarea id="inputNewResourceNote" class="form-control" rows="2" placeholder="Ej. Comprar en supermercado local, llevar en neverita con hielo..."></textarea>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modalNewMealResource')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar en el Banco de Comidas</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ASIGNAR RECURSO DE COMIDA A VIAJE -->
+  <div id="modalAssignMealToTrip" class="modal-overlay">
+    <div class="modal-box" style="max-width: 490px;">
+      <div class="modal-header">
+        <h3>➡️ Asignar Plato al Itinerario</h3>
+        <button class="modal-close" onclick="closeModal('modalAssignMealToTrip')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.85rem; margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700;">Plato seleccionado:</div>
+          <div id="assignMealDishName" style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;">-</div>
+          <div id="assignMealDishCategory" style="margin-top: 0.35rem;">-</div>
+        </div>
+
+        <form id="formAssignMealToTrip" onsubmit="handleConfirmAssignMeal(event)">
+          <input type="hidden" id="assignMealHiddenName" value="">
+          <input type="hidden" id="assignMealHiddenType" value="">
+
+          <!-- 1. VIAJE -->
+          <div class="form-group">
+            <label class="form-label">1. Viaje de destino:</label>
+            <select id="selectAssignMealTrip" class="form-control" onchange="handleAssignMealTripChange()" required>
+              <!-- Opciones ordenadas cronológicamente -->
+            </select>
+            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+              Orden cronológico: el próximo viaje aparece primero; los viajes pasados se sitúan al final.
+            </div>
+          </div>
+
+          <!-- 2. ETAPA (SI LA HUBIERA) -->
+          <div id="assignMealStageGroup" class="form-group" style="display: none;">
+            <label class="form-label">2. Etapa del viaje:</label>
+            <select id="selectAssignMealStage" class="form-control" onchange="handleAssignMealStageChange()">
+              <!-- Opciones de etapas -->
+            </select>
+          </div>
+
+          <!-- 3. DÍA -->
+          <div class="form-group">
+            <label class="form-label">3. Día del itinerario:</label>
+            <select id="selectAssignMealDay" class="form-control" required>
+              <!-- Opciones de días del viaje/etapa -->
+            </select>
+          </div>
+
+          <!-- 4. MOMENTO DEL DÍA -->
+          <div class="form-group">
+            <label class="form-label">4. Momento del día:</label>
+            <div style="display: flex; gap: 1rem; margin-top: 0.35rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight: 600;">
+                <input type="radio" name="assignMealTime" value="lunch" checked> ☀️ Mediodía
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight: 600;">
+                <input type="radio" name="assignMealTime" value="dinner"> 🌙 Cena
+              </label>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modalAssignMealToTrip')">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Confirmar y Asignar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTIONAR ETIQUETAS DEL BANCO DE COMIDAS -->
+  <div id="modalManageMealTags" class="modal-overlay">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>⚙️ Gestionar Etiquetas del Banco de Comidas</h3>
+        <button class="modal-close" onclick="closeModal('modalManageMealTags')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+          Modifica el nombre o suprime las etiquetas dinámicas creadas. Las etiquetas se ordenan automáticamente de forma alfabética.
+        </p>
+
+        <!-- Crear nueva etiqueta -->
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem;">
+          <input type="text" id="inputModalCreateTag" class="form-control" placeholder="Escribe nueva etiqueta..." style="font-size: 0.875rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();handleCreateTagFromManageModal();}">
+          <button type="button" class="btn btn-primary btn-sm" onclick="handleCreateTagFromManageModal()" style="white-space: nowrap;">+ Crear Etiqueta</button>
+        </div>
+
+        <!-- Lista de etiquetas ordenadas alfabéticamente con botones de modificar y suprimir -->
+        <div id="manageTagsListContainer" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding-right: 0.25rem;">
+          <!-- Renderizado dinámico -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 0.85rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalManageMealTags')">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ELIMINAR AÑO CON SEGURIDAD -->
+  <div id="modalDeleteYear" class="modal-overlay">
+    <div class="modal-box" style="max-width: 480px; border-top: 4px solid #ef4444;">
+      <div class="modal-header">
+        <h3 style="color: #b91c1c; display: flex; align-items: center; gap: 0.5rem;">
+          ⚠️ Eliminar Año y Datos Asociados
+        </h3>
+        <button class="modal-close" onclick="closeModal('modalDeleteYear')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.9rem; color: #334155; margin-bottom: 0.75rem;">
+          Estás a punto de eliminar permanentemente la planificación completa del año <strong id="deleteYearModalNum" style="color: #b91c1c;">2028</strong>.
+        </p>
+        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem; font-size: 0.825rem; color: #991b1b;">
+          <strong>Se eliminarán de forma irreversible:</strong>
+          <ul style="margin: 0.4rem 0 0 1.2rem; padding: 0;">
+            <li id="deleteYearTripCount">Todos los viajes e itinerarios</li>
+            <li>Todos los alojamientos, estancias y reservas</li>
+            <li>Todas las partidas de gastos, anticipos y tickets</li>
+            <li>Todos los presupuestos y estimaciones financieras</li>
+          </ul>
+        </div>
+        <p style="font-size: 0.85rem; color: #475569; margin-bottom: 0.5rem;">
+          Para confirmar la eliminación segura, escribe a continuación el año exacto: <strong id="deleteYearConfirmMatch" style="color: #b91c1c; font-family: monospace;">2028</strong>
+        </p>
+        <input type="text" id="inputConfirmDeleteYear" class="form-control" placeholder="Escribe el año para confirmar" autocomplete="off" oninput="handleDeleteYearInputCheck(this.value)">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalDeleteYear')">Cancelar</button>
+        <button type="button" id="btnConfirmDeleteYearSafe" class="btn btn-danger" disabled onclick="executeSafeDeleteYear()">
+          🗑️ Eliminar Año Definitivamente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SINCRONIZACIÓN EN LA NUBE (MULTI-DISPOSITIVO) -->
+  <div id="modalCloudSync" class="modal-overlay">
+    <div class="modal-box" style="max-width: 580px; border-top: 4px solid #2563eb;">
+      <div class="modal-header">
+        <h3 style="color: #1e40af; display: flex; align-items: center; gap: 0.5rem;">
+          ☁️ Sincronización en la Nube y Multi-Dispositivo
+        </h3>
+        <button class="modal-close" onclick="closeModal('modalCloudSync')">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size: 0.85rem; color: #334155;">
+        <!-- Estado actual de la sincronización -->
+        <div id="cloudSyncStatusBanner" style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.85rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span id="cloudSyncBannerIcon" style="font-size: 1.25rem;">⚪</span>
+            <div>
+              <div style="font-weight: 700; font-size: 0.875rem;" id="cloudSyncBannerStatus">Modo Local (Sin sincronización activa)</div>
+              <div style="font-size: 0.75rem; color: #64748b;" id="cloudSyncBannerSubtitle">Tus datos se guardan en este dispositivo. Conecta una base en la nube para sincronizar con tu móvil y otros dispositivos.</div>
+            </div>
+          </div>
+          <span id="cloudSyncLastTime" style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap;"></span>
+        </div>
+
+        <!-- Clave / Código de Grupo o Familia -->
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label class="form-label" style="font-weight: 700; color: #1e293b; font-size: 0.825rem; display: flex; justify-content: space-between;">
+            <span>🔑 Código o Clave de tu Familia / Grupo:</span>
+            <span style="font-weight: 400; color: #64748b; font-size: 0.75rem;">(Todos tus dispositivos usarán esta clave)</span>
+          </label>
+          <input type="text" id="inputCloudSyncKey" class="form-control" placeholder="Ej. familia-garcia-viajes" style="font-weight: 600; font-family: monospace;">
+          <div style="font-size: 0.725rem; color: #64748b; margin-top: 0.25rem;">
+            Inventa un código privado para tu grupo o mantén el sugerido. Cualquier móvil o tablet con esta clave compartirá exactamente los mismos viajes y presupuestos.
+          </div>
+        </div>
+
+        <!-- Servidor / Base de datos en la nube (Firebase Realtime Database) -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.85rem;">
+          <label class="form-label" style="font-weight: 700; color: #1e40af; font-size: 0.8rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
+            <span>🌐 URL de tu Base de Datos Firebase (Gratuita):</span>
+            <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-size: 0.75rem;">Consola Firebase ↗</a>
+          </label>
+          <input type="url" id="inputCloudDbUrl" class="form-control" placeholder="https://tu-proyecto-default-rtdb.firebaseio.com" style="font-size: 0.8rem;">
+          <div style="font-size: 0.725rem; color: #3b82f6; margin-top: 0.35rem; line-height: 1.35;">
+            💡 <strong>100% Gratuito y sin tarjeta de crédito:</strong> Entra en Firebase Console, crea un proyecto, activa <em>Realtime Database</em> y pega su URL aquí.
+          </div>
+        </div>
+
+        <!-- Enlace rápido para compartir con tu móvil / familia -->
+        <div id="cloudSyncShareRow" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.65rem 0.8rem; margin-bottom: 0.85rem;">
+          <div style="font-weight: 700; color: #15803d; font-size: 0.8rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.35rem;">
+            <span>📲</span> Enlace para abrir directamente desde tu móvil o tablet:
+          </div>
+          <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <input type="text" id="inputCloudShareUrl" class="form-control" readonly style="font-size: 0.75rem; background: white; color: #166534; font-family: monospace;">
+            <button type="button" class="btn btn-sm btn-success" onclick="copyCloudShareUrl()" style="white-space: nowrap; font-size: 0.75rem;">📋 Copiar</button>
+          </div>
+          <div style="font-size: 0.7rem; color: #166534; margin-top: 0.25rem;">
+            Al abrir este enlace en cualquier móvil, tablet o PC, se conectará y sincronizará automáticamente sin tener que configurar nada.
+          </div>
+        </div>
+
+        <!-- Acciones manuales de sincronización -->
+        <div style="display: flex; gap: 0.5rem; justify-content: space-between; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="forceCloudDownload()" style="font-size: 0.775rem;">
+            ⬇️ Descargar desde la nube
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="forceCloudUpload()" style="font-size: 0.775rem;">
+            ⬆️ Subir datos actuales a la nube
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-danger btn-sm" onclick="disconnectCloudSync()" id="btnDisconnectCloud" style="display: none;">
+          Desconectar
+        </button>
+        <div style="display: flex; gap: 0.5rem; margin-left: auto;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalCloudSync')">Cerrar</button>
+          <button type="button" class="btn btn-primary" onclick="saveAndConnectCloudSync()">
+            ☁️ Conectar y Sincronizar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR DE TOASTS -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+  </footer>
+
+  <!-- SCRIPTS -->
+  <script src="data.js?v=2.2"></script>
+  <script src="cloudSync.js?v=2.2"></script>
+  <script src="app.js?v=2.2"></script>
+</body>
+</html>
