@@ -3,6 +3,13 @@
 // ============================================================
 
 let db = loadDatabase();
+window.db = db;
+window.getAppDb = () => db;
+window.setAppDb = (newDb) => {
+  db = newDb;
+  window.db = newDb;
+  currentYear = db.activeYear || 2027;
+};
 let currentYear = db.activeYear || 2027;
 let currentTripId = null;
 let activeTab = 'tab-overview';
@@ -109,6 +116,8 @@ window.renderDailyTravelQuote = renderDailyTravelQuote;
 window.cycleTravelQuote = cycleTravelQuote;
 
 function initApp() {
+  db = loadDatabase();
+  window.db = db;
   // Asegurar que el año actual exista
   if (!db.years[currentYear]) {
     const yearKeys = Object.keys(db.years);
@@ -153,9 +162,7 @@ function initApp() {
   renderBudgetTab();
   initFuelCalculator();
 
-  if (typeof checkUrlCloudParametersAndInit === "function") {
-    checkUrlCloudParametersAndInit();
-  }
+// checkUrlCloudParametersAndInit is handled on load
 
   // Soporte para deep-linking de pestañas vía query string (?tab=expenses) o hash (#tab-expenses)
   const urlParams = new URLSearchParams(window.location.search);

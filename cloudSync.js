@@ -1,473 +1,414 @@
 // ============================================================
-// MODULO DE SINCRONIZACIÓN EN LA NUBE Y MULTI-DISPOSITIVO
+// CLOUD SYNC ENGINE — MODELO PLANIFICADOR DOCENTE 2026/2027
+// Firebase Realtime Database REST API
 // ============================================================
 
-const CLOUD_CONFIG_KEY = "TRAVEL_PLANNER_CLOUD_CONFIG";
-const CLOUD_DEVICE_ID_KEY = "TRAVEL_PLANNER_DEVICE_ID";
+// Base de datos en la nube (la misma configurada para el usuario)
+const DEFAULT_FIREBASE_DB = 'https://planificador-de-viajes-nyc-default-rtdb.europe-west1.firebasedatabase.app';
+const DEFAULT_PIN = 'boda-2012';
+const PIN_STORAGE_KEY = 'planificador_viajes_pin';
+const DB_URL_STORAGE_KEY = 'planificador_viajes_db_url';
 
-// Generar o recuperar ID único para este dispositivo
-function getDeviceId() {
-  let id = localStorage.getItem(CLOUD_DEVICE_ID_KEY);
-  if (!id) {
-    id = "dev_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now().toString(36);
-    localStorage.setItem(CLOUD_DEVICE_ID_KEY, id);
-  }
-  return id;
-}
-
-const currentDeviceId = getDeviceId();
-
-// Configuración de sincronización
-let cloudConfig = loadCloudConfig();
-let cloudSyncDebounceTimer = null;
-let cloudPollerTimer = null;
-let cloudEventSource = null;
-let lastKnownRemoteTimestamp = 0;
-let isSyncingToServer = false;
 let isReceivingFromServer = false;
+let autoSyncDebounceTimer = null;
+let syncPollerInterval = null;
+let lastKnownRemoteTime = 0;
 
-function loadCloudConfig() {
+// Obtener la URL activa de Firebase
+function getActiveFirebaseDb() {
   try {
-    const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
-    if (raw) {
-      return JSON.parse(raw);
+    const saved = localStorage.getItem(DB_URL_STORAGE_KEY);
+    if (saved && saved.trim()) {
+      return saved.trim().replace(/\/+$/, '');
     }
-  } catch (e) {
-    console.warn("Error cargando configuración cloud:", e);
-  }
-  return {
-    enabled: false,
-    dbUrl: "",
-    syncKey: generateDefaultSyncKey(),
-    lastSyncTime: null
-  };
+  } catch (e) {}
+  return DEFAULT_FIREBASE_DB;
 }
 
-function saveCloudConfig(cfg) {
-  cloudConfig = { ...cloudConfig, ...cfg };
-  window.cloudConfig = cloudConfig;
-window.getCloudConfig = () => cloudConfig;
-window.getCloudEndpointUrl = getCloudEndpointUrl;
+// Obtener el PIN activo (clave de sala)
+function getActivePin() {
   try {
-    localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(cloudConfig));
-  } catch (e) {
-    console.error("Error guardando configuración cloud:", e);
+    const saved = localStorage.getItem(PIN_STORAGE_KEY);
+    if (saved && saved.trim()) return saved.trim();
+    // Compatibilidad con claves previas
+    const oldConfig = localStorage.getItem('PLANIFICADOR_VIAJES_CLOUD_V1');
+    if (oldConfig) {
+      const parsed = JSON.parse(oldConfig);
+      if (parsed && parsed.syncKey) return parsed.syncKey;
+    }
+  } catch (e) {}
+  return DEFAULT_PIN;
+}
+
+function cleanPinKey(pin) {
+  if (!pin) return DEFAULT_PIN;
+  return pin.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-');
+}
+
+// Obtener la base de datos local actual
+function getCurrentAppDb() {
+  if (typeof window.getAppDb === 'function') {
+    const d = window.getAppDb();
+    if (d) return d;
   }
-  updateCloudSyncUI();
-}
-
-function generateDefaultSyncKey() {
-  const words = ["viaje", "familia", "ruta", "aventura", "norte", "verano", "escapada"];
-  const w1 = words[Math.floor(Math.random() * words.length)];
-  const randNum = Math.floor(100 + Math.random() * 900);
-  return `${w1}-${randNum}`;
-}
-
-function cleanDbUrl(url) {
-  if (!url) return "";
-  let clean = url.trim();
-  clean = clean.replace(/\/+$/, "");
-  if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-    clean = "https://" + clean;
+  if (window.db) return window.db;
+  if (typeof loadDatabase === 'function') {
+    try {
+      const d = loadDatabase();
+      if (d) return d;
+    } catch (e) {}
   }
-  return clean;
+  return null;
 }
 
-function cleanSyncKey(key) {
-  if (!key) return "";
-  return key.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-");
-}
+// Actualizar indicador visual en la cabecera
+function setAutoSyncStatus(text, type = 'normal') {
+  const iconEl = document.getElementById('cloudSyncStatusIcon');
+  const textEl = document.getElementById('cloudSyncStatusText');
+  const bannerIcon = document.getElementById('cloudSyncBannerIcon');
+  const bannerStatus = document.getElementById('cloudSyncBannerStatus');
+  const bannerSub = document.getElementById('cloudSyncBannerSubtitle');
+  const bannerTime = document.getElementById('cloudSyncLastTime');
 
-function getCloudEndpointUrl(config = cloudConfig) {
-  const base = cleanDbUrl(config.dbUrl);
-  const key = cleanSyncKey(config.syncKey);
-  if (!base || !key) return "";
-  return `${base}/rooms/${encodeURIComponent(key)}.json`;
-}
-
-// ------------------------------------------------------------
-// INTERFAZ DE USUARIO: INDICADOR Y MODAL
-// ------------------------------------------------------------
-function updateCloudSyncUI(status = null) {
-  const iconEl = document.getElementById("cloudSyncStatusIcon");
-  const textEl = document.getElementById("cloudSyncStatusText");
-  const bannerIcon = document.getElementById("cloudSyncBannerIcon");
-  const bannerStatus = document.getElementById("cloudSyncBannerStatus");
-  const bannerSub = document.getElementById("cloudSyncBannerSubtitle");
-  const bannerTime = document.getElementById("cloudSyncLastTime");
-  const btnDisconnect = document.getElementById("btnDisconnectCloud");
-  const shareRow = document.getElementById("cloudSyncShareRow");
-  const inputShareUrl = document.getElementById("inputCloudShareUrl");
-
-  let effectiveStatus = status;
-  if (!effectiveStatus) {
-    if (!cloudConfig.enabled || !cloudConfig.dbUrl || !cloudConfig.syncKey) {
-      effectiveStatus = "disabled";
+  if (iconEl && textEl) {
+    if (text.includes('Guardando')) {
+      iconEl.textContent = '⚡';
+      textEl.textContent = 'Guardando...';
+    } else if (text.includes('Sincronizado') || text.includes('Actualizado') || text.includes('Conectado')) {
+      iconEl.textContent = '🟢';
+      textEl.textContent = 'Sincronizado';
+    } else if (text.includes('Descargando') || text.includes('Conectando')) {
+      iconEl.textContent = '🔄';
+      textEl.textContent = 'Conectando...';
+    } else if (text.includes('Error') || text.includes('sin conexión')) {
+      iconEl.textContent = '⚠️';
+      textEl.textContent = 'Sin conexión';
     } else {
-      effectiveStatus = "connected";
+      iconEl.textContent = '🟢';
+      textEl.textContent = 'Sincronizado';
     }
   }
 
-  const timeStr = cloudConfig.lastSyncTime ? new Date(cloudConfig.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
-
-  if (effectiveStatus === "connected") {
-    if (iconEl) iconEl.textContent = "🟢";
-    if (textEl) textEl.textContent = "En línea";
-    if (bannerIcon) bannerIcon.textContent = "🟢";
-    if (bannerStatus) bannerStatus.textContent = "Conectado y Sincronizado";
-    if (bannerSub) bannerSub.textContent = `Sincronizando automáticamente en tiempo real bajo la clave: ${cloudConfig.syncKey}`;
-    if (bannerTime && timeStr) bannerTime.textContent = `Última sinc.: ${timeStr}`;
-    if (btnDisconnect) btnDisconnect.style.display = "inline-flex";
-    if (shareRow) shareRow.style.display = "block";
-    if (inputShareUrl) {
-      inputShareUrl.value = buildCloudShareUrl();
-    }
-  } else if (effectiveStatus === "syncing") {
-    if (iconEl) iconEl.textContent = "🟡";
-    if (textEl) textEl.textContent = "Sincronizando...";
-    if (bannerIcon) bannerIcon.textContent = "🟡";
-    if (bannerStatus) bannerStatus.textContent = "Guardando en la nube...";
-    if (bannerSub) bannerSub.textContent = "Transmitiendo cambios a tus otros dispositivos...";
-  } else if (effectiveStatus === "error") {
-    if (iconEl) iconEl.textContent = "🔴";
-    if (textEl) textEl.textContent = "Error sinc.";
-    if (bannerIcon) bannerIcon.textContent = "🔴";
-    if (bannerStatus) bannerStatus.textContent = "Atención: No se pudo conectar con la nube";
-    if (bannerSub) bannerSub.textContent = "Verifica la URL de tu base de datos o tu conexión a internet.";
-  } else {
-    // Disabled / Local
-    if (iconEl) iconEl.textContent = "⚪";
-    if (textEl) textEl.textContent = "Sincronizar";
-    if (bannerIcon) bannerIcon.textContent = "⚪";
-    if (bannerStatus) bannerStatus.textContent = "Modo Local (Sin sincronización activa)";
-    if (bannerSub) bannerSub.textContent = "Tus datos se guardan en este dispositivo. Conecta una base en la nube para sincronizar con tu móvil y otros dispositivos.";
-    if (bannerTime) bannerTime.textContent = "";
-    if (btnDisconnect) btnDisconnect.style.display = "none";
-    if (shareRow) shareRow.style.display = "none";
+  if (bannerStatus) bannerStatus.textContent = text;
+  if (bannerIcon) {
+    bannerIcon.textContent = text.includes('Guardando') ? '⚡' : (text.includes('Error') ? '⚠️' : '🟢');
+  }
+  if (bannerSub) {
+    bannerSub.textContent = `PIN Activo: "${getActivePin()}". Sincronización en tiempo real multi-dispositivo activa.`;
+  }
+  if (bannerTime) {
+    bannerTime.textContent = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 }
 
+// ------------------------------------------------------------
+// 1. PUSH A LA NUBE (Envía los datos a Firebase)
+// ------------------------------------------------------------
+async function autoPushToCloud(pin, dataObj, isManual = false) {
+  if (!pin || typeof pin !== 'string') return;
+  const cleanPin = cleanPinKey(pin);
+  const dbUrl = getActiveFirebaseDb();
+  if (!dbUrl) return;
+
+  const now = Date.now();
+  const payload = { ...dataObj, _lastUpdated: now };
+  const payloadStr = JSON.stringify(payload);
+
+  // 1. Guardar localmente
+  try {
+    localStorage.setItem('PLANIFICADOR_VIAJES_DB_V1', payloadStr);
+  } catch (e) {}
+
+  // 2. Enviar a Firebase REST
+  try {
+    setAutoSyncStatus('⚡ Guardando cambios...');
+    const res = await fetch(`${dbUrl}/rooms/${encodeURIComponent(cleanPin)}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payload: payload,
+        _lastUpdated: now,
+        timestamp: now
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    lastKnownRemoteTime = now;
+    setAutoSyncStatus('🟢 Sincronizado en tiempo real');
+    if (isManual) {
+      showToast('¡Datos subidos exitosamente a la nube!', 'success');
+    }
+  } catch (err) {
+    console.warn('Firebase push error:', err);
+    setAutoSyncStatus('⚠️ Guardado en este dispositivo (sin conexión)');
+    if (isManual) {
+      showToast(`Error al subir: ${err.message}`, 'error');
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// 2. FETCH DE LA NUBE (Descarga cambios desde Firebase)
+// ------------------------------------------------------------
+async function autoFetchFromCloud(pin, onNewData, isManual = false) {
+  if (!pin || typeof pin !== 'string') return false;
+  const cleanPin = cleanPinKey(pin);
+  const dbUrl = getActiveFirebaseDb();
+  if (!dbUrl) return false;
+
+  try {
+    const res = await fetch(`${dbUrl}/rooms/${encodeURIComponent(cleanPin)}.json?nocache=${Date.now()}`);
+    if (!res.ok) return false;
+    const remoteData = await res.json();
+    if (!remoteData || typeof remoteData !== 'object') return false;
+
+    // Aceptar tanto formato wrapped { payload, _lastUpdated } como directo
+    const actualData = (remoteData.payload && typeof remoteData.payload === 'object') ? remoteData.payload : remoteData;
+    const remoteTime = remoteData._lastUpdated || remoteData.timestamp || actualData._lastUpdated || actualData.timestamp || 0;
+
+    let localTime = 0;
+    try {
+      const loc = localStorage.getItem('PLANIFICADOR_VIAJES_DB_V1');
+      if (loc) {
+        const parsed = JSON.parse(loc);
+        localTime = parsed._lastUpdated || 0;
+      }
+    } catch (e) {}
+
+    // Si la versión en la nube es más reciente o si es descarga manual
+    if (remoteTime > localTime + 500 || isManual) {
+      lastKnownRemoteTime = remoteTime;
+      actualData._lastUpdated = remoteTime;
+
+      // 1. Guardar en localStorage
+      try {
+        localStorage.setItem('PLANIFICADOR_VIAJES_DB_V1', JSON.stringify(actualData));
+      } catch (e) {}
+
+      // 2. Notificar callback para actualizar estado en memoria y pantalla
+      if (typeof onNewData === 'function') {
+        onNewData(actualData);
+      }
+
+      setAutoSyncStatus('🟢 Sincronizado en tiempo real');
+      if (isManual) {
+        showToast('¡Datos descargados y sincronizados desde la nube!', 'success');
+      }
+      return true;
+    }
+  } catch (err) {
+    console.warn('Firebase fetch error:', err);
+    if (isManual) {
+      showToast(`Error al descargar: ${err.message}`, 'error');
+    }
+  }
+  return false;
+}
+
+// ------------------------------------------------------------
+// 3. HOOK AUTOMÁTICO AL GUARDAR CUALQUIER CAMBIO
+// ------------------------------------------------------------
+function onDatabaseSavedHook(data) {
+  if (isReceivingFromServer) return;
+  const pin = getActivePin();
+  if (!pin) return;
+
+  setAutoSyncStatus('⚡ Guardando cambios...');
+  if (autoSyncDebounceTimer) {
+    clearTimeout(autoSyncDebounceTimer);
+  }
+
+  // Debounce de 1200ms para agrupar escrituras rápidas
+  autoSyncDebounceTimer = setTimeout(() => {
+    const currentData = data || getCurrentAppDb();
+    if (currentData) {
+      autoPushToCloud(pin, currentData, false);
+    }
+  }, 1200);
+}
+
+// ------------------------------------------------------------
+// 4. BUCLE DE ESCUCHA PERIÓDICO Y EVENTOS DE PANTALLA
+// ------------------------------------------------------------
+function startAutoSyncLoop() {
+  const checkSync = () => {
+    if (isReceivingFromServer) return;
+    const pin = getActivePin();
+    if (!pin) return;
+
+    autoFetchFromCloud(pin, (newData) => {
+      isReceivingFromServer = true;
+
+      // Actualizar variables globales de la app
+      window.db = newData;
+      if (typeof window.setAppDb === 'function') {
+        window.setAppDb(newData);
+      }
+
+      // Re-renderizar la interfaz completa con los datos nuevos
+      if (typeof initApp === 'function') {
+        initApp();
+      }
+
+      showToast('☁️ Planificador actualizado automáticamente desde otro dispositivo', 'info');
+
+      setTimeout(() => {
+        isReceivingFromServer = false;
+      }, 500);
+    }, false);
+  };
+
+  // 1. Verificación inicial inmediata
+  checkSync();
+
+  // 2. Comprobación periódica cada 4 segundos
+  if (syncPollerInterval) clearInterval(syncPollerInterval);
+  syncPollerInterval = setInterval(checkSync, 4000);
+
+  // 3. Eventos instantáneos al recuperar foco o volver a la pestaña en móviles
+  window.removeEventListener('focus', checkSync);
+  window.addEventListener('focus', checkSync);
+
+  document.removeEventListener('visibilitychange', checkSync);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkSync();
+    }
+  });
+}
+
+// ------------------------------------------------------------
+// 5. GESTIÓN DEL MODAL Y ACCIONES DE USUARIO
+// ------------------------------------------------------------
 function openCloudSyncModal() {
-  const inputKey = document.getElementById("inputCloudSyncKey");
-  const inputUrl = document.getElementById("inputCloudDbUrl");
+  const inputPin = document.getElementById('inputCloudSyncKey');
+  const inputDb = document.getElementById('inputCloudDbUrl');
+  const shareRow = document.getElementById('cloudSyncShareRow');
+  const shareInput = document.getElementById('inputCloudShareUrl');
 
-  if (inputKey) inputKey.value = cloudConfig.syncKey || generateDefaultSyncKey();
-  if (inputUrl) inputUrl.value = cloudConfig.dbUrl || "";
+  if (inputPin) inputPin.value = getActivePin();
+  if (inputDb) inputDb.value = getActiveFirebaseDb();
 
-  updateCloudSyncUI();
-  openModal("modalCloudSync");
+  if (shareRow && shareInput) {
+    shareRow.style.display = 'block';
+    shareInput.value = buildCloudShareUrl();
+  }
+
+  setAutoSyncStatus('🟢 Conectado');
+  openModal('modalCloudSync');
 }
 
 function buildCloudShareUrl() {
   const origin = window.location.origin + window.location.pathname;
-  const key = encodeURIComponent(cloudConfig.syncKey || "");
-  const dbParam = encodeURIComponent(cloudConfig.dbUrl || "");
-  return `${origin}?sync=${key}&db=${dbParam}`;
+  const pin = encodeURIComponent(getActivePin());
+  return `${origin}?pin=${pin}`;
 }
 
 function copyCloudShareUrl() {
   const url = buildCloudShareUrl();
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => {
-      showToast("¡Enlace copiado! Ábrelo en tu móvil para sincronizarte al instante.", "success");
+      showToast('¡Enlace copiado! Ábrelo en tu móvil para sincronizarte al instante.', 'success');
     }).catch(() => {
-      prompt("Copia este enlace para abrirlo en tu móvil:", url);
+      prompt('Copia este enlace para abrirlo en tu móvil:', url);
     });
   } else {
-    prompt("Copia este enlace para abrirlo en tu móvil:", url);
+    prompt('Copia este enlace para abrirlo en tu móvil:', url);
   }
 }
 
-// ------------------------------------------------------------
-// TRANSMISIÓN Y SINCRONIZACIÓN AUTOMÁTICA
-// ------------------------------------------------------------
-
-// Se invoca automáticamente desde saveDatabase(data)
-function onDatabaseSavedHook(data) {
-  if (!cloudConfig.enabled || !cloudConfig.dbUrl || !cloudConfig.syncKey || isReceivingFromServer) {
-    return;
-  }
-
-  // Cancelar envío previo y debouncar para evitar peticiones repetidas al escribir rápido
-  if (cloudSyncDebounceTimer) {
-    clearTimeout(cloudSyncDebounceTimer);
-  }
-
-  updateCloudSyncUI("syncing");
-
-  cloudSyncDebounceTimer = setTimeout(() => {
-    uploadDatabaseToCloud(data);
-  }, 650);
-}
-
-async function uploadDatabaseToCloud(data, isManual = false) {
-  const endpoint = getCloudEndpointUrl();
-  if (!endpoint) return;
-
-  isSyncingToServer = true;
-  updateCloudSyncUI("syncing");
-
-  const payload = {
-    payload: data,
-    timestamp: Date.now(),
-    deviceId: currentDeviceId
-  };
-
-  try {
-    const res = await fetch(endpoint, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status}: ${res.statusText}`);
-    }
-
-    lastKnownRemoteTimestamp = payload.timestamp;
-    saveCloudConfig({ lastSyncTime: payload.timestamp });
-    updateCloudSyncUI("connected");
-
-    if (isManual) {
-      showToast("¡Datos subidos exitosamente a la nube!", "success");
-    }
-  } catch (err) {
-    console.error("Error al subir a la nube:", err);
-    updateCloudSyncUI("error");
-    if (isManual) {
-      showToast(`Error al subir a la nube: ${err.message}`, "error");
-    }
-  } finally {
-    isSyncingToServer = false;
-  }
-}
-
-async function downloadDatabaseFromCloud(isManual = false) {
-  const endpoint = getCloudEndpointUrl();
-  if (!endpoint) return;
-
-  try {
-    updateCloudSyncUI("syncing");
-    const res = await fetch(endpoint, { method: "GET" });
-
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status}`);
-    }
-
-    const remoteData = await res.json();
-    if (!remoteData || !remoteData.payload) {
-      if (isManual) {
-        showToast("La sala en la nube está vacía. Se subirán los datos actuales de este dispositivo.", "info");
-        await uploadDatabaseToCloud(window.db, true);
-      }
-      updateCloudSyncUI("connected");
-      return;
-    }
-
-    // Verificar si es de otro dispositivo o más reciente
-    const remoteTime = remoteData.timestamp || 0;
-    const isFromOtherDevice = remoteData.deviceId !== currentDeviceId;
-
-    if (remoteTime > lastKnownRemoteTimestamp || isManual) {
-      lastKnownRemoteTimestamp = remoteTime;
-      isReceivingFromServer = true;
-
-      // Actualizar base de datos local
-      window.db = remoteData.payload;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteData.payload));
-      } catch (e) {}
-
-      saveCloudConfig({ lastSyncTime: remoteTime });
-      updateCloudSyncUI("connected");
-
-      // Refrescar vistas activas en la aplicación
-      if (typeof initApp === "function") {
-        initApp();
-      }
-
-      if (isManual) {
-        showToast("¡Datos descargados y sincronizados desde la nube!", "success");
-      } else if (isFromOtherDevice) {
-        showToast("☁️ Planificador actualizado automáticamente desde otro dispositivo", "info");
-      }
-
-      setTimeout(() => {
-        isReceivingFromServer = false;
-      }, 500);
-    } else {
-      updateCloudSyncUI("connected");
-    }
-  } catch (err) {
-    console.error("Error al descargar desde la nube:", err);
-    updateCloudSyncUI("error");
-    if (isManual) {
-      showToast(`Error al descargar: ${err.message}`, "error");
-    }
-  }
-}
-
-// Iniciar escucha continua en tiempo real (Poller inteligente y ligero)
-function startCloudRealtimeListener() {
-  stopCloudRealtimeListener();
-
-  if (!cloudConfig.enabled || !cloudConfig.dbUrl || !cloudConfig.syncKey) {
-    return;
-  }
-
-  // Realizar primera descarga inicial
-  downloadDatabaseFromCloud(false);
-
-  // Escuchar con Server-Sent Events (SSE) si la base soporta /rooms/<key>.json
-  // Firebase Realtime DB soporta SSE nativo añadiendo accept: text/event-stream
-  const endpoint = getCloudEndpointUrl();
-  if (endpoint && window.EventSource) {
-    try {
-      cloudEventSource = new EventSource(endpoint);
-      cloudEventSource.addEventListener("put", (e) => {
-        if (isSyncingToServer) return;
-        try {
-          const parsed = JSON.parse(e.data);
-          if (parsed && parsed.data && parsed.data.payload) {
-            if (parsed.data.deviceId !== currentDeviceId && parsed.data.timestamp > lastKnownRemoteTimestamp) {
-              downloadDatabaseFromCloud(false);
-            }
-          }
-        } catch(err) {}
-      });
-      cloudEventSource.onerror = () => {
-        // Fallback al poller si SSE tiene restricciones de CORS
-        if (cloudEventSource) {
-          try { cloudEventSource.close(); } catch(e){}
-          cloudEventSource = null;
-        }
-      };
-    } catch(e) {}
-  }
-
-  // Polling de respaldo cada 5 segundos si la ventana está visible
-  cloudPollerTimer = setInterval(() => {
-    if (document.visibilityState === "visible" && !isSyncingToServer && cloudConfig.enabled) {
-      downloadDatabaseFromCloud(false);
-    }
-  }, 5000);
-}
-
-function stopCloudRealtimeListener() {
-  if (cloudPollerTimer) {
-    clearInterval(cloudPollerTimer);
-    cloudPollerTimer = null;
-  }
-  if (cloudEventSource) {
-    try { cloudEventSource.close(); } catch(e){}
-    cloudEventSource = null;
-  }
-}
-
-// ------------------------------------------------------------
-// GESTIÓN DE ACCIONES DE USUARIO
-// ------------------------------------------------------------
 async function saveAndConnectCloudSync() {
-  const inputKey = document.getElementById("inputCloudSyncKey");
-  const inputUrl = document.getElementById("inputCloudDbUrl");
+  const inputPin = document.getElementById('inputCloudSyncKey');
+  const inputDb = document.getElementById('inputCloudDbUrl');
 
-  const keyVal = cleanSyncKey(inputKey ? inputKey.value : "");
-  let urlVal = cleanDbUrl(inputUrl ? inputUrl.value : "");
+  const newPin = cleanPinKey(inputPin ? inputPin.value : getActivePin());
+  const newDb = inputDb ? inputDb.value.trim().replace(/\/+$/, '') : getActiveFirebaseDb();
 
-  if (!keyVal) {
-    alert("Por favor introduce una clave o código para tu familia/grupo.");
-    return;
-  }
+  try {
+    localStorage.setItem(PIN_STORAGE_KEY, newPin);
+    if (newDb) {
+      localStorage.setItem(DB_URL_STORAGE_KEY, newDb);
+    }
+  } catch (e) {}
 
-  if (!urlVal) {
-    alert("Por favor introduce la URL de tu base de datos Firebase Realtime Database (ej: https://tu-proyecto-default-rtdb.firebaseio.com).");
-    return;
-  }
+  closeModal('modalCloudSync');
+  showToast(`✅ Conectado con el PIN: ${newPin}`, 'success');
+  setAutoSyncStatus('🟢 Sincronizado en tiempo real');
 
-  saveCloudConfig({
-    enabled: true,
-    dbUrl: urlVal,
-    syncKey: keyVal
-  });
-
-  updateCloudSyncUI("syncing");
-  closeModal("modalCloudSync");
-  showToast("Conectando con la nube...", "info");
-
-  // Descargar o sincronizar
-  await downloadDatabaseFromCloud(true);
-  startCloudRealtimeListener();
+  // Comprobar y descargar inmediatamente
+  autoFetchFromCloud(newPin, (newData) => {
+    window.db = newData;
+    if (typeof window.setAppDb === 'function') window.setAppDb(newData);
+    if (typeof initApp === 'function') initApp();
+  }, true);
 }
 
 function disconnectCloudSync() {
-  if (confirm("¿Deseas desconectar este dispositivo de la sincronización en la nube? Seguirás teniendo tus datos locales en este navegador.")) {
-    stopCloudRealtimeListener();
-    saveCloudConfig({
-      enabled: false
-    });
-    updateCloudSyncUI("disabled");
-    closeModal("modalCloudSync");
-    showToast("Sincronización en la nube desactivada. La app funciona ahora en modo local.", "info");
+  if (confirm('¿Deseas desconectar la sincronización automática? La aplicación continuará en modo local.')) {
+    if (syncPollerInterval) clearInterval(syncPollerInterval);
+    setAutoSyncStatus('Modo Local (Desconectado)', 'disabled');
+    closeModal('modalCloudSync');
+    showToast('Sincronización en la nube desactivada.', 'info');
   }
 }
 
 function forceCloudUpload() {
-  if (!cloudConfig.dbUrl || !cloudConfig.syncKey) {
-    alert("Primero debes configurar y conectar tu base de datos en la nube.");
+  const pin = getActivePin();
+  const d = getCurrentAppDb();
+  if (!d) {
+    alert('No se encontraron datos locales para subir.');
     return;
   }
-  if (confirm("¿Subir todos los datos actuales de este dispositivo a la nube? Se sobrescribirá lo que haya en la sala.")) {
-    uploadDatabaseToCloud(window.db, true);
+  if (confirm(`¿Subir todos los datos actuales de este dispositivo a la nube bajo el PIN "${pin}"?`)) {
+    autoPushToCloud(pin, d, true);
   }
 }
 
 function forceCloudDownload() {
-  if (!cloudConfig.dbUrl || !cloudConfig.syncKey) {
-    alert("Primero debes configurar y conectar tu base de datos en la nube.");
-    return;
-  }
-  if (confirm("¿Descargar y reemplazar tus datos locales con los de la nube?")) {
-    downloadDatabaseFromCloud(true);
+  const pin = getActivePin();
+  if (confirm(`¿Descargar los datos de la nube del PIN "${pin}" y reemplazar los locales?`)) {
+    autoFetchFromCloud(pin, (newData) => {
+      window.db = newData;
+      if (typeof window.setAppDb === 'function') window.setAppDb(newData);
+      if (typeof initApp === 'function') initApp();
+    }, true);
   }
 }
 
-// Inicialización automática al cargar (comprueba query string ?sync= y ?db=)
-function checkUrlCloudParametersAndInit(searchOverride = null) {
+// ------------------------------------------------------------
+// 6. INICIALIZACIÓN AUTOMÁTICA AL ABRIR LA WEB
+// ------------------------------------------------------------
+function checkUrlCloudParametersAndInit() {
   try {
-    const search = searchOverride !== null ? searchOverride : window.location.search;
-    const urlParams = new URLSearchParams(search);
-    const syncParam = urlParams.get("sync");
-    const dbParam = urlParams.get("db");
+    const urlParams = new URLSearchParams(window.location.search);
+    const pinParam = urlParams.get('pin') || urlParams.get('sync');
+    const dbParam = urlParams.get('db');
 
-    if (syncParam) {
-      const cleanKey = cleanSyncKey(syncParam);
-      const cleanUrl = dbParam ? cleanDbUrl(dbParam) : (cloudConfig.dbUrl || "");
-
-      if (cleanKey) {
-        saveCloudConfig({
-          enabled: true,
-          syncKey: cleanKey,
-          dbUrl: cleanUrl || cloudConfig.dbUrl
-        });
-        showToast(`📲 Dispositivo vinculado automáticamente con la clave: ${cleanKey}`, "success");
-      }
+    if (pinParam) {
+      const cleanPin = cleanPinKey(pinParam);
+      try {
+        localStorage.setItem(PIN_STORAGE_KEY, cleanPin);
+      } catch (e) {}
+      showToast(`📲 Dispositivo vinculado automáticamente con el PIN: ${cleanPin}`, 'success');
     }
 
-    updateCloudSyncUI();
-
-    if (cloudConfig.enabled && cloudConfig.dbUrl && cloudConfig.syncKey) {
-      startCloudRealtimeListener();
+    if (dbParam) {
+      try {
+        localStorage.setItem(DB_URL_STORAGE_KEY, dbParam.trim().replace(/\/+$/, ''));
+      } catch (e) {}
     }
+
+    setAutoSyncStatus('🟢 Conectado');
+    startAutoSyncLoop();
   } catch (e) {
-    console.error("Error en auto-init cloud sync:", e);
+    console.error('Error en inicialización cloudSync:', e);
   }
 }
 
 // Exportar funciones a window
-window.cloudConfig = cloudConfig;
-window.getCloudConfig = () => cloudConfig;
-window.getCloudEndpointUrl = getCloudEndpointUrl;
-window.getDeviceId = getDeviceId;
 window.openCloudSyncModal = openCloudSyncModal;
 window.saveAndConnectCloudSync = saveAndConnectCloudSync;
 window.disconnectCloudSync = disconnectCloudSync;
@@ -476,4 +417,14 @@ window.forceCloudDownload = forceCloudDownload;
 window.copyCloudShareUrl = copyCloudShareUrl;
 window.onDatabaseSavedHook = onDatabaseSavedHook;
 window.checkUrlCloudParametersAndInit = checkUrlCloudParametersAndInit;
-window.updateCloudSyncUI = updateCloudSyncUI;
+window.setAutoSyncStatus = setAutoSyncStatus;
+window.autoPushToCloud = autoPushToCloud;
+window.autoFetchFromCloud = autoFetchFromCloud;
+window.getActivePin = getActivePin;
+
+// Iniciar automáticamente cuando carga el DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkUrlCloudParametersAndInit);
+} else {
+  checkUrlCloudParametersAndInit();
+}
