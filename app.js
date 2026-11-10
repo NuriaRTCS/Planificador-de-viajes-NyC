@@ -7577,8 +7577,17 @@ function openTripModal(tripToEdit = null) {
   openModal("modalTrip");
 }
 
+let isSavingTripLock = false;
+
 function handleSaveTrip(e) {
   if (e && e.preventDefault) e.preventDefault();
+  if (isSavingTripLock) {
+    console.warn("handleSaveTrip bloqueado: guardado ya en curso");
+    return;
+  }
+  isSavingTripLock = true;
+  setTimeout(() => { isSavingTripLock = false; }, 800);
+
   const yearData = db.years[currentYear];
   if (!yearData) return;
   if (!yearData.trips) yearData.trips = [];
@@ -7705,6 +7714,19 @@ function handleSaveTrip(e) {
       showToast("Datos generales del viaje actualizados con éxito", "success");
     }
   } else {
+    // Evitar creación de viaje duplicado idéntico
+    const isDuplicate = yearData.trips.some(t => 
+      t.name.trim().toLowerCase() === name.toLowerCase() &&
+      t.startDate === startDate &&
+      t.endDate === endDate
+    );
+    if (isDuplicate) {
+      console.warn("Viaje con el mismo nombre y fechas ya existe en este año, omitiendo duplicado.");
+      closeModal("modalTrip");
+      isSavingTripLock = false;
+      return;
+    }
+
     // CREAR NUEVO VIAJE
     const newId = 'trip_' + Date.now();
     let newTrip = {
