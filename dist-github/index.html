@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.2">
+  <link rel="stylesheet" href="styles.css?v=3.0">
   <!-- Leaflet Map CSS y JS para selección interactiva de puntos -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -1641,27 +1641,27 @@
           <span id="cloudSyncLastTime" style="font-size: 0.7rem; color: #94a3b8; white-space: nowrap;"></span>
         </div>
 
-        <!-- Clave / Código de Grupo o Familia -->
+        <!-- PIN de Sincronización (Modelo Planificador Docente) -->
         <div class="form-group" style="margin-bottom: 0.85rem;">
           <label class="form-label" style="font-weight: 700; color: #1e293b; font-size: 0.825rem; display: flex; justify-content: space-between;">
-            <span>🔑 Código o Clave de tu Familia / Grupo:</span>
-            <span style="font-weight: 400; color: #64748b; font-size: 0.75rem;">(Todos tus dispositivos usarán esta clave)</span>
+            <span>🔑 PIN de Sincronización en Tiempo Real:</span>
+            <span style="font-weight: 400; color: #64748b; font-size: 0.75rem;">(Todos tus dispositivos usarán este PIN)</span>
           </label>
-          <input type="text" id="inputCloudSyncKey" class="form-control" placeholder="Ej. familia-garcia-viajes" style="font-weight: 600; font-family: monospace;">
+          <input type="text" id="inputCloudSyncKey" class="form-control" placeholder="Ej. boda-2012" style="font-weight: 700; font-family: monospace; font-size: 1rem; color: #1e40af; letter-spacing: 1px;">
           <div style="font-size: 0.725rem; color: #64748b; margin-top: 0.25rem;">
-            Inventa un código privado para tu grupo o mantén el sugerido. Cualquier móvil o tablet con esta clave compartirá exactamente los mismos viajes y presupuestos.
+            Introduce este mismo PIN en tu móvil, tablet o PC para que cualquier cambio se sincronice automáticamente al instante, igual que en el Planificador Docente.
           </div>
         </div>
 
-        <!-- Servidor / Base de datos en la nube (Firebase Realtime Database) -->
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.85rem;">
-          <label class="form-label" style="font-weight: 700; color: #1e40af; font-size: 0.8rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
-            <span>🌐 URL de tu Base de Datos Firebase (Gratuita):</span>
-            <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-size: 0.75rem;">Consola Firebase ↗</a>
+        <!-- Servidor Firebase Preconfigurado -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.85rem;">
+          <label class="form-label" style="font-weight: 700; color: #166534; font-size: 0.8rem; margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
+            <span>🌐 Servidor Firebase (Preconfigurado y Conectado):</span>
+            <span style="color: #15803d; font-size: 0.725rem;">✔ Activo</span>
           </label>
-          <input type="url" id="inputCloudDbUrl" class="form-control" placeholder="https://tu-proyecto-default-rtdb.firebaseio.com" style="font-size: 0.8rem;">
-          <div style="font-size: 0.725rem; color: #3b82f6; margin-top: 0.35rem; line-height: 1.35;">
-            💡 <strong>100% Gratuito y sin tarjeta de crédito:</strong> Entra en Firebase Console, crea un proyecto, activa <em>Realtime Database</em> y pega su URL aquí.
+          <input type="url" id="inputCloudDbUrl" class="form-control" style="font-size: 0.775rem; font-family: monospace; background: white; color: #334155;">
+          <div style="font-size: 0.725rem; color: #166534; margin-top: 0.35rem; line-height: 1.35;">
+            ⚡ <strong>Conexión directa en tiempo real:</strong> No necesitas configurar nada más. Cada vez que modifiques un viaje, parada o actividad, se sincroniza en vivo.
           </div>
         </div>
 
@@ -1711,8 +1711,8 @@
   </footer>
 
   <!-- SCRIPTS -->
-  <script src="data.js?v=2.2"></script>
-  <script src="cloudSync.js?v=2.2"></script>
-  <script src="app.js?v=2.2"></script>
+  <script src="data.js?v=3.0"></script>
+  <script src="cloudSync.js?v=3.0"></script>
+  <script src="app.js?v=3.0"></script>
 </body>
 </html>
