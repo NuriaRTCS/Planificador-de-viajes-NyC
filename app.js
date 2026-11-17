@@ -2267,18 +2267,22 @@ function renderModalActivitiesList() {
     }];
   }
 
+  const dayNumInput = document.getElementById("inputDayNum");
+  const currentDayNum = (dayNumInput && dayNumInput.value) ? dayNumInput.value.trim() : "";
+
   container.innerHTML = modalDayActivitiesListState.map((act, idx) => {
     const isFirst = idx === 0;
     const isNoDisp = Boolean(act.noDisplacement);
     const m = calculateRouteMetrics(act.origin, act.destination, act.departureTime || "09:00", act.stopDurationMin || 0, null, null, act.stopCount);
     const hasRoute = Boolean(act.origin || act.destination) && !isNoDisp;
+    const activityCode = currentDayNum ? `${currentDayNum}.${idx + 1}` : `${idx + 1}`;
 
     return `
       <div class="modal-activity-row" draggable="true" data-modal-act-idx="${idx}" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.35rem 0.5rem; margin-bottom: 0.35rem; box-shadow: 0 1px 2px rgba(0,0,0,0.02); transition: all 0.15s ease;">
-        <!-- Número de la actividad y descripción en la MISMA LÍNEA (formato limpio y sin grandes espacios) -->
+        <!-- Número de la actividad y descripción en la MISMA LÍNEA (código nº día.nº actividad) -->
         <div style="display: flex; align-items: center; gap: 0.4rem; width: 100%;">
           <span class="activity-drag-handle" title="Arrastra para reordenar esta actividad dentro del día" style="cursor: grab; color: #94a3b8; font-size: 1.15rem; line-height: 1; user-select: none;">⋮⋮</span>
-          <strong class="activity-num-badge" style="color: #2563eb; font-size: 0.85rem; min-width: 20px;">${idx + 1}.</strong>
+          <strong class="activity-num-badge" style="color: #2563eb; font-size: 0.85rem; min-width: 28px;">${activityCode}</strong>
           <input type="text" class="form-control modal-act-text-input" style="flex: 1; min-width: 120px; font-size: 0.825rem; padding: 0.25rem 0.5rem; height: 31px;" placeholder="Descripción de la actividad..." value="${escapeHtml(act.text || '')}" oninput="updateModalActivityText(${idx}, this.value)">
           
           <div style="display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
@@ -2516,8 +2520,8 @@ function openDayRouteModal(dayIndex, activityIndex = 0) {
     if (activities.length > 1) {
       selectorRow.style.display = "block";
       selector.innerHTML = activities.map((a, i) => {
-        const previewText = a.text ? a.text.substring(0, 32) : `Actividad ${i + 1}`;
-        return `<option value="${i}" ${i === activityIndex ? 'selected' : ''}>Línea ${i + 1}: ${escapeHtml(previewText)}</option>`;
+        const previewText = a.text ? a.text.substring(0, 32) : `Actividad ${targetDay.dayNum}.${i + 1}`;
+        return `<option value="${i}" ${i === activityIndex ? 'selected' : ''}>Actividad ${targetDay.dayNum}.${i + 1}: ${escapeHtml(previewText)}</option>`;
       }).join("");
     } else {
       selectorRow.style.display = "none";
@@ -3453,7 +3457,7 @@ function renderDayActivitiesCell(day, trip) {
         <div class="day-activity-item" data-day-orig-index="${day._origIndex}" data-act-index="0" style="margin-bottom: 0.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.35rem; margin-bottom: 0.2rem;">
             <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1;">
-              <strong style="color: #2563eb; font-size: 0.825rem; white-space: nowrap;">1.</strong>
+              <strong style="color: #2563eb; font-size: 0.825rem; white-space: nowrap;">${day.dayNum}.1</strong>
               <textarea class="inline-plan-input" 
                 rows="1"
                 placeholder="Escribe el plan o actividad..." 
@@ -3487,7 +3491,7 @@ function renderDayActivitiesCell(day, trip) {
         <div class="day-activity-text" style="display: flex; align-items: center; justify-content: space-between; gap: 0.35rem;">
           <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 0;">
             <span class="activity-drag-handle" title="Arrastra para reordenar esta actividad dentro del día">⋮⋮</span>
-            <strong style="color: #2563eb; font-size: 0.825rem; white-space: nowrap;">${actIdx + 1}.</strong>
+            <strong style="color: #2563eb; font-size: 0.825rem; white-space: nowrap;">${day.dayNum}.${actIdx + 1}</strong>
             <span style="font-weight: 500; word-break: break-word;">${escapeHtml(act.text || '(Sin descripción)')}</span>
             ${isNoDisp ? `
               <span class="no-displacement-badge" title="Actividad sin desplazamiento asociado" style="font-size: 0.68rem; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 1px 5px; border-radius: 4px; margin-left: 0.35rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;">
@@ -3523,7 +3527,7 @@ function renderItineraryTab() {
 
   if (!trip) {
     banner.innerHTML = `<p style="padding: 1rem; color: #64748b;">No hay viaje seleccionado.</p>`;
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem;">No hay viaje activo.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem;">No hay viaje activo.</td></tr>`;
     if (title) title.textContent = "🗺️ Hoja de ruta (viaje o etapa asociada)";
     return;
   }
@@ -3701,7 +3705,7 @@ function renderItineraryTab() {
   }
 
   if (rawDays.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">No hay días planificados aún para este viaje. Haz clic en <strong>+ Añadir Día</strong>.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">No hay días planificados aún para este viaje. Haz clic en <strong>+ Añadir Día</strong>.</td></tr>`;
     return;
   }
 
@@ -3787,7 +3791,7 @@ function renderItineraryTab() {
       pastDividerRendered = true;
       rowsHtml.push(`
         <tr class="itinerary-past-divider">
-          <td colspan="7">
+          <td colspan="6">
             ⬇️ Días pasados del viaje (desplazados automáticamente al final de la lista)
           </td>
         </tr>
@@ -3887,58 +3891,71 @@ rowsHtml.push(`
         <td style="vertical-align: top;">
           ${planCellHtml}
         </td>
-        <td style="vertical-align: top;">
-          <div class="inline-meal-editor">
-            <div class="inline-meal-row">
-              <select class="inline-meal-select ${metaLunch.tagClass}" 
-                id="inline_lunch_select_${day._origIndex}"
-                title="Seleccionar tipo de comida (Mediodía)"
-                onchange="handleInlineMealSelectChange(${day._origIndex}, 'lunch', this.value)">
-                <option value="" ${parsedLunch.type === '' ? 'selected' : ''}>— Ninguno —</option>
-                <option value="Tránsito" ${parsedLunch.type === 'Tránsito' ? 'selected' : ''}>🚗 Tránsito</option>
-                <option value="Alojamiento" ${parsedLunch.type === 'Alojamiento' ? 'selected' : ''}>🏠 Alojamiento</option>
-                <option value="Bar/Restaurante" ${parsedLunch.type === 'Bar/Restaurante' ? 'selected' : ''}>🍽️ Bar/Restaurante</option>
-                <option value="Picnic" ${parsedLunch.type === 'Picnic' ? 'selected' : ''}>🧺 Picnic</option>
-                <option value="Barbacoa" ${parsedLunch.type === 'Barbacoa' ? 'selected' : ''}>🔥 Barbacoa</option>
-                <option value="Otro" ${parsedLunch.type === 'Otro' ? 'selected' : ''}>🍴 Otro...</option>
-              </select>
-              <button type="button" class="btn-meal-bank-add" 
-                onclick="goToMealBankForDay(${day._origIndex}, 'lunch')" 
-                title="Acceder al Banco de comidas para inspirarte o asignar recetas">+</button>
+        <td style="vertical-align: top; padding: 0.35rem 0.45rem;">
+          <div class="inline-meals-stacked" style="display: flex; flex-direction: column; gap: 0.35rem;">
+            <!-- MEDIODÍA -->
+            <div class="inline-meal-editor" style="background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 6px; padding: 0.25rem 0.35rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                <span style="font-size: 0.68rem; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 2px;">
+                  ☀️ Mediodía:
+                </span>
+              </div>
+              <div class="inline-meal-row">
+                <select class="inline-meal-select ${metaLunch.tagClass}" 
+                  id="inline_lunch_select_${day._origIndex}"
+                  title="Seleccionar tipo de comida (Mediodía)"
+                  onchange="handleInlineMealSelectChange(${day._origIndex}, 'lunch', this.value)">
+                  <option value="" ${parsedLunch.type === '' ? 'selected' : ''}>— Ninguno —</option>
+                  <option value="Tránsito" ${parsedLunch.type === 'Tránsito' ? 'selected' : ''}>🚗 Tránsito</option>
+                  <option value="Alojamiento" ${parsedLunch.type === 'Alojamiento' ? 'selected' : ''}>🏠 Alojamiento</option>
+                  <option value="Bar/Restaurante" ${parsedLunch.type === 'Bar/Restaurante' ? 'selected' : ''}>🍽️ Bar/Restaurante</option>
+                  <option value="Picnic" ${parsedLunch.type === 'Picnic' ? 'selected' : ''}>🧺 Picnic</option>
+                  <option value="Barbacoa" ${parsedLunch.type === 'Barbacoa' ? 'selected' : ''}>🔥 Barbacoa</option>
+                  <option value="Otro" ${parsedLunch.type === 'Otro' ? 'selected' : ''}>🍴 Otro...</option>
+                </select>
+                <button type="button" class="btn-meal-bank-add" 
+                  onclick="goToMealBankForDay(${day._origIndex}, 'lunch')" 
+                  title="Acceder al Banco de comidas para inspirarte o asignar recetas">+</button>
+              </div>
+              <input type="text" class="inline-meal-detail" 
+                id="inline_lunch_detail_${day._origIndex}"
+                value="${escapeHtml(parsedLunch.detail)}" 
+                placeholder="+ detalle mediodía..." 
+                title="Escribir información adicional (Mediodía)"
+                onchange="handleInlineMealDetailChange(${day._origIndex}, 'lunch', this.value)">
             </div>
-            <input type="text" class="inline-meal-detail" 
-              id="inline_lunch_detail_${day._origIndex}"
-              value="${escapeHtml(parsedLunch.detail)}" 
-              placeholder="+ detalle / información..." 
-              title="Escribir información adicional (Mediodía)"
-              onchange="handleInlineMealDetailChange(${day._origIndex}, 'lunch', this.value)">
-          </div>
-        </td>
-        <td style="vertical-align: top;">
-          <div class="inline-meal-editor">
-            <div class="inline-meal-row">
-              <select class="inline-meal-select ${metaDinner.tagClass}" 
-                id="inline_dinner_select_${day._origIndex}"
-                title="Seleccionar tipo de comida (Cena)"
-                onchange="handleInlineMealSelectChange(${day._origIndex}, 'dinner', this.value)">
-                <option value="" ${parsedDinner.type === '' ? 'selected' : ''}>— Ninguno —</option>
-                <option value="Alojamiento" ${parsedDinner.type === 'Alojamiento' ? 'selected' : ''}>🏠 Alojamiento</option>
-                <option value="Bar/Restaurante" ${parsedDinner.type === 'Bar/Restaurante' ? 'selected' : ''}>🍽️ Bar/Restaurante</option>
-                <option value="Barbacoa" ${parsedDinner.type === 'Barbacoa' ? 'selected' : ''}>🔥 Barbacoa</option>
-                <option value="Tránsito" ${parsedDinner.type === 'Tránsito' ? 'selected' : ''}>🚗 Tránsito</option>
-                <option value="Picnic" ${parsedDinner.type === 'Picnic' ? 'selected' : ''}>🧺 Picnic</option>
-                <option value="Otro" ${parsedDinner.type === 'Otro' ? 'selected' : ''}>🍴 Otro...</option>
-              </select>
-              <button type="button" class="btn-meal-bank-add" 
-                onclick="goToMealBankForDay(${day._origIndex}, 'dinner')" 
-                title="Acceder al Banco de comidas para inspirarte o asignar recetas">+</button>
+
+            <!-- CENA -->
+            <div class="inline-meal-editor" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.25rem 0.35rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                <span style="font-size: 0.68rem; font-weight: 700; color: #4338ca; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 2px;">
+                  🌙 Cena:
+                </span>
+              </div>
+              <div class="inline-meal-row">
+                <select class="inline-meal-select ${metaDinner.tagClass}" 
+                  id="inline_dinner_select_${day._origIndex}"
+                  title="Seleccionar tipo de comida (Cena)"
+                  onchange="handleInlineMealSelectChange(${day._origIndex}, 'dinner', this.value)">
+                  <option value="" ${parsedDinner.type === '' ? 'selected' : ''}>— Ninguno —</option>
+                  <option value="Alojamiento" ${parsedDinner.type === 'Alojamiento' ? 'selected' : ''}>🏠 Alojamiento</option>
+                  <option value="Bar/Restaurante" ${parsedDinner.type === 'Bar/Restaurante' ? 'selected' : ''}>🍽️ Bar/Restaurante</option>
+                  <option value="Barbacoa" ${parsedDinner.type === 'Barbacoa' ? 'selected' : ''}>🔥 Barbacoa</option>
+                  <option value="Tránsito" ${parsedDinner.type === 'Tránsito' ? 'selected' : ''}>🚗 Tránsito</option>
+                  <option value="Picnic" ${parsedDinner.type === 'Picnic' ? 'selected' : ''}>🧺 Picnic</option>
+                  <option value="Otro" ${parsedDinner.type === 'Otro' ? 'selected' : ''}>🍴 Otro...</option>
+                </select>
+                <button type="button" class="btn-meal-bank-add" 
+                  onclick="goToMealBankForDay(${day._origIndex}, 'dinner')" 
+                  title="Acceder al Banco de comidas para inspirarte o asignar recetas">+</button>
+              </div>
+              <input type="text" class="inline-meal-detail" 
+                id="inline_dinner_detail_${day._origIndex}"
+                value="${escapeHtml(parsedDinner.detail)}" 
+                placeholder="+ detalle cena..." 
+                title="Escribir información adicional (Cena)"
+                onchange="handleInlineMealDetailChange(${day._origIndex}, 'dinner', this.value)">
             </div>
-            <input type="text" class="inline-meal-detail" 
-              id="inline_dinner_detail_${day._origIndex}"
-              value="${escapeHtml(parsedDinner.detail)}" 
-              placeholder="+ detalle / información..." 
-              title="Escribir información adicional (Cena)"
-              onchange="handleInlineMealDetailChange(${day._origIndex}, 'dinner', this.value)">
           </div>
         </td>
         <td style="text-align: center; vertical-align: middle;" class="no-print">
