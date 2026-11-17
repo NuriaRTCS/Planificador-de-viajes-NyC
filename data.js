@@ -353,12 +353,14 @@ function loadDatabase() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Validar estructura básica
-      if (parsed && parsed.years && parsed.years[2027]) {
+      // Validar estructura básica (admite 2027 o cualquier año válido registrado)
+      if (parsed && parsed.years && typeof parsed.years === 'object' && Object.keys(parsed.years).length > 0) {
         // Eliminar años 2024 y 2023 si estaban guardados previamente
         if (parsed.years[2024]) delete parsed.years[2024];
         if (parsed.years[2023]) delete parsed.years[2023];
-        if (parsed.activeYear === 2024 || parsed.activeYear === 2023) parsed.activeYear = 2027;
+        if (parsed.activeYear === 2024 || parsed.activeYear === 2023 || !parsed.years[parsed.activeYear]) {
+          parsed.activeYear = parsed.years[2027] ? 2027 : parseInt(Object.keys(parsed.years)[0]);
+        }
         if (!parsed.historicalMenus) parsed.historicalMenus = INITIAL_TRIP_DATABASE.historicalMenus;
 
         // Gestión de etiquetas dinámicas (db.mealTags)
@@ -408,7 +410,7 @@ function loadDatabase() {
             });
           }
         });
-        saveDatabase(parsed);
+        saveDatabase(parsed, false);
         return parsed;
       }
     }
@@ -418,13 +420,13 @@ function loadDatabase() {
   return JSON.parse(JSON.stringify(INITIAL_TRIP_DATABASE));
 }
 
-function saveDatabase(data) {
+function saveDatabase(data, isUserAction = true) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error("Error al guardar en localStorage:", e);
   }
-  if (typeof onDatabaseSavedHook === "function") {
+  if (isUserAction && typeof onDatabaseSavedHook === "function") {
     onDatabaseSavedHook(data);
   }
 }

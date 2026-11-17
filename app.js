@@ -3256,7 +3256,8 @@ function updateItineraryDistancesDynamically() {
     }
   });
 
-  saveDatabase(db);
+  // Guardado en segundo plano sin disparar push a la nube si la inicialización está en curso
+  saveDatabase(db, false);
 }
 
 function syncItineraryWithGoogleMaps() {
@@ -8021,7 +8022,7 @@ window.openMapPickerModal = openMapPickerModal;
 window.initOrUpdatePickerMap = initOrUpdatePickerMap;
 window.handleMapPickerClick = handleMapPickerClick;
 window.handleMapPickerSearch = handleMapPickerSearch;
-window.applyNamedLocationToPicker = applyNamedLocationToPicker;
+if (typeof applyNamedLocationToPicker !== 'undefined') window.applyNamedLocationToPicker = applyNamedLocationToPicker;
 window.selectMapPreset = selectMapPreset;
 window.clearMapPickerSelection = clearMapPickerSelection;
 window.confirmMapPickerSelection = confirmMapPickerSelection;

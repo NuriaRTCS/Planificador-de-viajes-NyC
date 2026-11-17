@@ -1,6 +1,6 @@
 // ============================================================
 // CLOUD SYNC ENGINE — MODELO PLANIFICADOR DOCENTE 2026/2027
-// Firebase Realtime Database REST API
+// Firebase Realtime Database REST API + Anti-Sobreescritura
 // ============================================================
 
 // Base de datos en la nube (la misma configurada para el usuario)
@@ -8,8 +8,11 @@ const DEFAULT_FIREBASE_DB = 'https://planificador-de-viajes-nyc-default-rtdb.eur
 const DEFAULT_PIN = 'boda-2012';
 const PIN_STORAGE_KEY = 'planificador_viajes_pin';
 const DB_URL_STORAGE_KEY = 'planificador_viajes_db_url';
+const SAFETY_BACKUP_KEY = 'planificador_safety_backup_before_sync';
+const SAFETY_BACKUP_TIME_KEY = 'planificador_safety_backup_time';
 
 let isReceivingFromServer = false;
+let hasInitialSyncCompleted = false; // Bloquea sobreescrituras accidentales durante el arranque
 let autoSyncDebounceTimer = null;
 let syncPollerInterval = null;
 let lastKnownRemoteTime = 0;
@@ -45,6 +48,18 @@ function cleanPinKey(pin) {
   return pin.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-');
 }
 
+// Contar el número total de viajes en una base de datos
+function countTripsInDb(database) {
+  if (!database || !database.years || typeof database.years !== 'object') return 0;
+  let count = 0;
+  Object.values(database.years).forEach(y => {
+    if (y && Array.isArray(y.trips)) {
+      count += y.trips.length;
+    }
+  });
+  return count;
+}
+
 // Obtener la base de datos local actual
 function getCurrentAppDb() {
   if (typeof window.getAppDb === 'function') {
@@ -59,6 +74,90 @@ function getCurrentAppDb() {
     } catch (e) {}
   }
   return null;
+}
+
+// ------------------------------------------------------------
+// SISTEMA DE COPIA DE SEGURIDAD PREVIA (SAFETY ROLLBACK)
+// Permite recuperar datos locales en 1 clic si se sobreescriben
+// ------------------------------------------------------------
+function saveSafetyBackup(data, reason = 'auto_backup') {
+  try {
+    if (!data) return;
+    const str = typeof data === 'string' ? data : JSON.stringify(data);
+    localStorage.setItem(SAFETY_BACKUP_KEY, str);
+    localStorage.setItem(SAFETY_BACKUP_TIME_KEY, new Date().toISOString());
+    updateSafetyBackupBanners();
+  } catch (e) {
+    console.warn('[CloudSync] No se pudo guardar la copia de seguridad previa:', e);
+  }
+}
+
+function restoreSafetyBackup() {
+  try {
+    const backupStr = localStorage.getItem(SAFETY_BACKUP_KEY);
+    if (!backupStr) {
+      alert('No se encontró ninguna copia previa en la memoria de este navegador.');
+      return;
+    }
+    const parsed = JSON.parse(backupStr);
+    if (!parsed || !parsed.years) {
+      alert('El archivo de respaldo previo está dañado o incompleto.');
+      return;
+    }
+
+    if (!confirm('¿Deseas restaurar la copia de seguridad previa y recuperar tus datos anteriores?')) {
+      return;
+    }
+
+    // Salvar la actual como temporal
+    const currentLoc = localStorage.getItem('PLANIFICADOR_VIAJES_DB_V1');
+    if (currentLoc) {
+      localStorage.setItem('planificador_safety_backup_restored_temp', currentLoc);
+    }
+
+    // Restaurar en memoria y en localStorage
+    window.db = parsed;
+    if (typeof window.setAppDb === 'function') window.setAppDb(parsed);
+    if (typeof saveDatabase === 'function') saveDatabase(parsed, true);
+    if (typeof initApp === 'function') initApp();
+
+    // Sincronizar inmediatamente a la nube bajo el PIN activo
+    const pin = getActivePin();
+    if (pin) {
+      autoPushToCloud(pin, parsed, true);
+    }
+
+    showToast('🎉 ¡Copia de seguridad previa restaurada y sincronizada con éxito!', 'success');
+    closeModal('modalCloudSync');
+    closeModal('modalBackup');
+  } catch (e) {
+    console.error('[CloudSync] Error al restaurar safety backup:', e);
+    alert('Ocurrió un error al intentar restaurar la copia previa: ' + e.message);
+  }
+}
+
+function updateSafetyBackupBanners() {
+  const hasBackup = !!localStorage.getItem(SAFETY_BACKUP_KEY);
+  const backupTime = localStorage.getItem(SAFETY_BACKUP_TIME_KEY);
+  let timeText = '';
+  if (backupTime) {
+    try {
+      const d = new Date(backupTime);
+      timeText = ` (Guardada el ${d.toLocaleDateString('es-ES')} a las ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})`;
+    } catch (e) {}
+  }
+
+  const banners = [
+    document.getElementById('safetyBackupBannerCloud'),
+    document.getElementById('safetyBackupBannerModalBackup')
+  ];
+  banners.forEach(b => {
+    if (b) {
+      b.style.display = hasBackup ? 'flex' : 'none';
+      const timeSpan = b.querySelector('.safety-backup-time');
+      if (timeSpan) timeSpan.textContent = timeText;
+    }
+  });
 }
 
 // Actualizar indicador visual en la cabecera
@@ -102,13 +201,57 @@ function setAutoSyncStatus(text, type = 'normal') {
 }
 
 // ------------------------------------------------------------
-// 1. PUSH A LA NUBE (Envía los datos a Firebase)
+// 1. PUSH A LA NUBE (Envía los datos a Firebase con Anti-Sobreescritura)
 // ------------------------------------------------------------
 async function autoPushToCloud(pin, dataObj, isManual = false) {
   if (!pin || typeof pin !== 'string') return;
+  if (isReceivingFromServer) return;
+
+  // Bloqueo de seguridad: No empujar datos viejos hasta que el arranque confirme el estado de la nube
+  if (!hasInitialSyncCompleted && !isManual) {
+    console.log('[CloudSync] autoPush bloqueado: esperando a que finalice la sincronización inicial con la nube.');
+    return;
+  }
+
   const cleanPin = cleanPinKey(pin);
   const dbUrl = getActiveFirebaseDb();
   if (!dbUrl) return;
+
+  // VERIFICACIÓN PREVIA DE CONFLICTOS REMOTOS (Anti-Sobreescritura de versiones más nuevas o con más viajes)
+  if (!isManual) {
+    try {
+      const checkRes = await fetch(`${dbUrl}/rooms/${encodeURIComponent(cleanPin)}.json?nocache=${Date.now()}`);
+      if (checkRes.ok) {
+        const remoteData = await checkRes.json();
+        if (remoteData) {
+          const actualRemote = (remoteData.payload && typeof remoteData.payload === 'object') ? remoteData.payload : remoteData;
+          const remoteTime = remoteData._lastUpdated || remoteData.timestamp || actualRemote._lastUpdated || actualRemote.timestamp || 0;
+          const remoteTrips = countTripsInDb(actualRemote);
+          const localTrips = countTripsInDb(dataObj);
+
+          // Si la versión en la nube es más reciente que nuestra última sincronización conocida
+          // o si la nube tiene más viajes que los datos locales (evita borrar viajes creados en otro equipo)
+          if ((remoteTime > (lastKnownRemoteTime || 0) + 1500) || (remoteTrips > localTrips && remoteTime > (dataObj._lastUpdated || 0))) {
+            console.warn(`[CloudSync] Conflicto prevenido: la nube tiene datos más recientes o más viajes (${remoteTrips} vs ${localTrips}). Cancelando subida y descargando versión más reciente.`);
+            setAutoSyncStatus('🔄 Descargando versión más reciente de la nube...');
+
+            // Guardar copia local de seguridad por precaución antes de descargar
+            saveSafetyBackup(dataObj, 'conflicto_detectado');
+
+            await autoFetchFromCloud(pin, (newData) => {
+              window.db = newData;
+              if (typeof window.setAppDb === 'function') window.setAppDb(newData);
+              if (typeof initApp === 'function') initApp();
+              showToast('☁️ Se ha descargado la versión más reciente para evitar perder datos', 'info');
+            }, false);
+            return;
+          }
+        }
+      }
+    } catch (checkErr) {
+      console.warn('[CloudSync] No se pudo verificar versión remota previa al push:', checkErr);
+    }
+  }
 
   const now = Date.now();
   const payload = { ...dataObj, _lastUpdated: now };
@@ -161,25 +304,45 @@ async function autoFetchFromCloud(pin, onNewData, isManual = false) {
 
   try {
     const res = await fetch(`${dbUrl}/rooms/${encodeURIComponent(cleanPin)}.json?nocache=${Date.now()}`);
-    if (!res.ok) return false;
+    if (!res.ok) {
+      hasInitialSyncCompleted = true;
+      return false;
+    }
     const remoteData = await res.json();
-    if (!remoteData || typeof remoteData !== 'object') return false;
+    if (!remoteData || typeof remoteData !== 'object') {
+      hasInitialSyncCompleted = true;
+      return false;
+    }
 
     // Aceptar tanto formato wrapped { payload, _lastUpdated } como directo
     const actualData = (remoteData.payload && typeof remoteData.payload === 'object') ? remoteData.payload : remoteData;
     const remoteTime = remoteData._lastUpdated || remoteData.timestamp || actualData._lastUpdated || actualData.timestamp || 0;
 
     let localTime = 0;
+    let localData = null;
     try {
       const loc = localStorage.getItem('PLANIFICADOR_VIAJES_DB_V1');
       if (loc) {
-        const parsed = JSON.parse(loc);
-        localTime = parsed._lastUpdated || 0;
+        localData = JSON.parse(loc);
+        localTime = localData._lastUpdated || 0;
       }
     } catch (e) {}
 
-    // Si la versión en la nube es más reciente o si es descarga manual
-    if (remoteTime > localTime + 500 || isManual) {
+    const remoteTrips = countTripsInDb(actualData);
+    const localTrips = countTripsInDb(localData);
+
+    // Si la versión en la nube es más reciente, tiene más viajes, o es descarga manual
+    const shouldUpdate = isManual || (remoteTime > localTime + 500) || (remoteTrips > localTrips && remoteTime >= localTime);
+
+    if (shouldUpdate) {
+      // Guardar copia de seguridad previa antes de actualizar
+      try {
+        const currentLoc = localStorage.getItem('PLANIFICADOR_VIAJES_DB_V1');
+        if (currentLoc) {
+          saveSafetyBackup(currentLoc, 'antes_de_actualizacion_nube');
+        }
+      } catch (e) {}
+
       lastKnownRemoteTime = remoteTime;
       actualData._lastUpdated = remoteTime;
 
@@ -197,13 +360,20 @@ async function autoFetchFromCloud(pin, onNewData, isManual = false) {
       if (isManual) {
         showToast('¡Datos descargados y sincronizados desde la nube!', 'success');
       }
+      hasInitialSyncCompleted = true;
       return true;
+    } else {
+      if (remoteTime > 0) {
+        lastKnownRemoteTime = Math.max(lastKnownRemoteTime, remoteTime);
+      }
     }
   } catch (err) {
     console.warn('Firebase fetch error:', err);
     if (isManual) {
       showToast(`Error al descargar: ${err.message}`, 'error');
     }
+  } finally {
+    hasInitialSyncCompleted = true;
   }
   return false;
 }
@@ -213,6 +383,10 @@ async function autoFetchFromCloud(pin, onNewData, isManual = false) {
 // ------------------------------------------------------------
 function onDatabaseSavedHook(data) {
   if (isReceivingFromServer) return;
+  if (!hasInitialSyncCompleted) {
+    console.log('[CloudSync] onDatabaseSavedHook ignorado durante la inicialización');
+    return;
+  }
   const pin = getActivePin();
   if (!pin) return;
 
@@ -234,7 +408,7 @@ function onDatabaseSavedHook(data) {
 // 4. BUCLE DE ESCUCHA PERIÓDICO Y EVENTOS DE PANTALLA
 // ------------------------------------------------------------
 function startAutoSyncLoop() {
-  const checkSync = () => {
+  const checkSync = (isFirstCheck = false) => {
     if (isReceivingFromServer) return;
     const pin = getActivePin();
     if (!pin) return;
@@ -258,26 +432,31 @@ function startAutoSyncLoop() {
       setTimeout(() => {
         isReceivingFromServer = false;
       }, 500);
-    }, false);
+    }, false).finally(() => {
+      hasInitialSyncCompleted = true;
+      updateSafetyBackupBanners();
+    });
   };
 
   // 1. Verificación inicial inmediata
-  checkSync();
+  checkSync(true);
 
   // 2. Comprobación periódica cada 4 segundos
   if (syncPollerInterval) clearInterval(syncPollerInterval);
-  syncPollerInterval = setInterval(checkSync, 4000);
+  syncPollerInterval = setInterval(() => checkSync(false), 4000);
 
   // 3. Eventos instantáneos al recuperar foco o volver a la pestaña en móviles
   window.removeEventListener('focus', checkSync);
-  window.addEventListener('focus', checkSync);
+  window.addEventListener('focus', () => checkSync(false));
 
   document.removeEventListener('visibilitychange', checkSync);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      checkSync();
+      checkSync(false);
     }
   });
+
+  updateSafetyBackupBanners();
 }
 
 // ------------------------------------------------------------
@@ -297,6 +476,7 @@ function openCloudSyncModal() {
     shareInput.value = buildCloudShareUrl();
   }
 
+  updateSafetyBackupBanners();
   setAutoSyncStatus('🟢 Conectado');
   openModal('modalCloudSync');
 }
@@ -421,6 +601,8 @@ window.setAutoSyncStatus = setAutoSyncStatus;
 window.autoPushToCloud = autoPushToCloud;
 window.autoFetchFromCloud = autoFetchFromCloud;
 window.getActivePin = getActivePin;
+window.restoreSafetyBackup = restoreSafetyBackup;
+window.updateSafetyBackupBanners = updateSafetyBackupBanners;
 
 // Iniciar automáticamente cuando carga el DOM
 if (document.readyState === 'loading') {
